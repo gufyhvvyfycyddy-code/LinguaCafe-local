@@ -3,6 +3,12 @@
 *.scss linguist-vendored
 *.js linguist-vendored
 CHANGELOG.md export-ignore
+
+# Keep local configuration and credential snapshots out of source archives.
+.env -diff export-ignore
+.env.* -diff export-ignore
+.env.example -export-ignore
+.env.*.example -export-ignore
 /public/images/flags/** export-ignore
 
 # make sure executable/build-control text has the right line endings
