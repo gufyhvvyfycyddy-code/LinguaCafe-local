@@ -1200,7 +1200,7 @@ Anki 桌面端支持无密码 Profile 选择，每个 Profile 有独立 collecti
 | B-007 P1 DOM 空格 | FIXED-WAITING-VERIFY | `TextBlockGroup.vue` 普通模式现有 `reader-semantic-space` 元素及真实空格文本；待真实页面验证 DOM、复制、查找和逐词点击没有回归。 |
 | B-008 P1 Jellyfin 500 | FIXED-WAITING-VERIFY | `app/Services/Settings/SettingValueService.php::isJellyfinEnabled()` 在缺配置时现返回 `false`；待本机没有 Jellyfin 配置的普通导入窗口 GUI/Network 验证。 |
 | B-009 P2 字符数输入 | OPEN（仅源码） | `ImportOptions.vue` 仍仅 `@keyup` 与 `@click` 通知父层，缺标准 `@input/@change`；可在 P0 主路径后做真实粘贴数值验证。 |
-| B-010 P2 登录字体 401 | UNKNOWN | 尚无新登录页 Network 证据；旧版 HTTP 401 不自动算仍在新版本复现。 |
+| B-010 P2 登录字体 401 | OPEN（隔离 PC Test GUI 实证；正式学习环境未验） | 2026-11-06 在已核隔离 Docker 运行时，Chrome 156 真实渲染 `/login`，使用浏览器事件点击输入框与输入后，Network 明确出现 `HTTP 401:/fonts/get-fonts-for-language/english`，同时记录页面 Promise 异常；登录页有两个输入框和登录按钮且可交互。因 PC Test 目前用户数0、20迁移 Pending，未作真实登录；先只修登录前请求受保护字体接口的调用时机，须独立 GUI 复测。 |
 | B-011 P2 reviewIntervals | UNKNOWN | 未重新核当前 testing-only doctor/旧 stage 路径；不得据历史记录清理设置或 FSRS。 |
 | B-012 P0 Reasonix 监督 | OPEN（工具链专项独立） | 历史标明 `Workaround Active / Root Fix Required`，须由原 `reasonix-supervision-toolchain-bug-ledger-2026-08-05.md` 管事实；未获真实新链路验收，不重报已修。当前真实学习 GUI 能使用其他合规通道时，不把工具链单一失败误判产品不可用。 |
 
