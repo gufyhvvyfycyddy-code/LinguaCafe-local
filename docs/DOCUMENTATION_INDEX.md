@@ -7,7 +7,7 @@
 1. `AGENTS.md` — 每次必读的项目硬规则。
 2. `docs/CURRENT_AI_CONTEXT.md` — 当前事实、计划完成度、开放维护项和停止点；默认只加载这份状态文档。
 3. 先判断任务类型，再按需加载：
-   - 继续一个已明确的当前任务：只读 `docs/plans/current-working-handoff.md` 顶部权威区和该任务相关段落，不默认加载全文。
+   - 继续一个已明确的当前任务：先核 `docs/execution/CURRENT_MILESTONE.json` 的实际任务锁与 `docs/CURRENT_AI_CONTEXT.md`；仅追溯旧任务时按需读取 `docs/plans/current-working-handoff.md` 顶部历史状态或对应段落。
    - 选择、插入或调整产品任务：只读 master plan 的 Open Work Registry，再读 Anki-aligned roadmap 的相关 Phase。
    - 已明确的模块任务：直接读对应 ADR、模块契约、源码、测试和一个既有范例。
 4. 不默认读取全部计划、全部 ADR、全部历史或全部字幕。
@@ -18,7 +18,8 @@
 
 - AI 最小当前上下文：`docs/CURRENT_AI_CONTEXT.md`
 - 工作区只读盘点与稳定化：`docs/plans/workspace-stabilization-plan-2026-08-03.md`；运行 `node scripts/workspace-inventory.mjs`
-- 当前工作台与任务追溯：`docs/plans/current-working-handoff.md`
+- 当前任务允许范围与停止点：`docs/execution/CURRENT_MILESTONE.json`（须结合最新实际 Git/用户授权核对）
+- 历史工作台与任务追溯（不授权新任务）：`docs/plans/current-working-handoff.md`
 - 长期工作登记：`docs/plans/linguacafe-master-plan.md`
 - 已确认产品方向与讨论路线：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
 - 产品/架构顺序：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`

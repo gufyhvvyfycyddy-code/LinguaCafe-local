@@ -1,7 +1,7 @@
 # LinguaCafe History Index
 
 > **Status**: Historical document index.
-> **Last updated**: 2026-08-06 (historical QA handoffs registered; current execution replacement corrected).
+> **Last updated**: 2026-11-06 (current authority routes clarified; historical QA handoff records retained).
 
 This file keeps old documents discoverable while lowering their context priority. Do not delete these files, and do not start a new task from them.
 
@@ -13,10 +13,10 @@ These files have names that sound current but are no longer current entry points
 
 | File | Historical stage | Can still be referenced? | Why not current | Current replacement |
 |---|---|---|---|---|
-| `docs/NEXT_TASK.md` | Early FSRS / local modification phase | Only for historical audit | Name suggests current next task, but its task order is stale | `docs/plans/current-working-handoff.md` |
-| `docs/CURRENT_STATUS.md` | 2026-06-17 era local status | Only for historical audit | Name suggests current state, but project has moved through many later phases | `docs/plans/current-working-handoff.md` |
+| `docs/NEXT_TASK.md` | Early FSRS / local modification phase | Only for historical audit | Name suggests current next task, but its task order is stale | `docs/CURRENT_AI_CONTEXT.md` + `docs/execution/CURRENT_MILESTONE.json` |
+| `docs/CURRENT_STATUS.md` | 2026-06-17 era local status | Only for historical audit | Name suggests current state, but project has moved through many later phases | `docs/CURRENT_AI_CONTEXT.md` + `docs/execution/CURRENT_MILESTONE.json` |
 | `docs/FSRS_FINAL_STATUS.md` | Old FSRS phase summary | Only for old FSRS phase context | "Final" means final for that old phase, not final architecture | `docs/plans/linguacafe-master-plan.md` |
-| `docs/CODEX_HANDOFF.md` | 2026-06-23 Codex handoff | Partial background only | Old handoff can mislead Codex into starting from obsolete tasks | `docs/plans/current-working-handoff.md` |
+| `docs/CODEX_HANDOFF.md` | 2026-06-23 Codex handoff | Partial background only | Old handoff can mislead Codex into starting from obsolete tasks | `docs/CURRENT_AI_CONTEXT.md` + `docs/execution/CURRENT_MILESTONE.json` |
 
 ## 2. FSRS Phase History
 
@@ -38,7 +38,7 @@ The following files document earlier FSRS implementation phases. They are retain
 Current FSRS / sense-only direction lives in:
 
 - `docs/plans/linguacafe-master-plan.md`
-- `docs/plans/current-working-handoff.md`
+- `docs/plans/current-working-handoff.md`（仅用于历史任务追溯，不授权当前工作）
 - `docs/plans/repo-architecture-hotspot-audit.md`
 - `docs/plans/spec-to-harness-candidates.md`
 
