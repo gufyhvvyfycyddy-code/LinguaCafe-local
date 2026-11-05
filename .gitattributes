@@ -4,6 +4,12 @@
 *.js linguist-vendored
 CHANGELOG.md export-ignore
 
+# Keep local configuration and credential snapshots out of source archives.
+.env -diff export-ignore
+.env.* -diff export-ignore
+.env.example -export-ignore
+.env.*.example -export-ignore
+
 # make sure executables have the right line endings
 *.sh text eol=lf
 ./tools/django_server/manage.py text eol=lf
