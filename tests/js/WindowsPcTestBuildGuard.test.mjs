@@ -31,6 +31,8 @@ assert.match(compose, /mysql-data:\/var\/lib\/mysql/);
 assert.match(compose, /PC_TEST_SOURCE_COMMIT: \$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(runtime, /linguacafe-pc-test-next/);
 assert.match(runtime, /LinguaCafePCTestNext/);
+assert.equal((windowCode.match(/LinguaCafePCTestNext/g) ?? []).length, 2);
+assert.doesNotMatch(windowCode, /"LinguaCafePCTest"/);
 for (const dockerfile of [read('docker', 'PhpDockerfile'), read('docker', 'PythonDockerfile')]) {
   assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$PC_TEST_SOURCE_COMMIT/);
 }
