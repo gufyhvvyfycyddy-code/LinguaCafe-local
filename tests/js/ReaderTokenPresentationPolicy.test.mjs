@@ -264,8 +264,9 @@ test('TextBlockGroup delegates presentation while retaining the token DOM bounda
     assert.equal(textBlockSource.includes('<template v-for="(word, wordIndex) in words"><!--'), true);
 });
 
-test('Reader owns one hidden-hover-visible AI translation mode', () => {
-    assert.equal(textReaderSource.includes("aiTranslationMode: 'hidden'"), true);
+test('Reader defaults saved sentence translations to visible but preserves the manual toggle', () => {
+    assert.equal(textReaderSource.includes("aiTranslationMode: 'visible'"), true);
+    assert.equal(textReaderSource.includes("if (data.has_saved_assist && !this.hasSavedAiAssist) this.aiTranslationMode = 'visible'"), true);
     assert.equal(textReaderSource.includes(':ai-translation-mode="aiTranslationMode"'), true);
     assert.equal(textReaderSource.includes("this.aiTranslationMode = 'hover'"), true);
     assert.equal(textReaderSource.includes("this.aiTranslationMode = 'visible'"), true);
