@@ -89,14 +89,22 @@ try {
     # Previous app directories remain immutable. Switch only the shortcut.
     Move-Item -LiteralPath $stageDir -Destination $releaseDir
     $stageDir = $null
-    if (Test-Path -LiteralPath $shortcutPath) {
-        $shortcutBackup = Join-Path $installRoot ("shortcut-before-" + $nonce + ".lnk")
-        [System.IO.File]::Replace($tempShortcut, $shortcutPath, $shortcutBackup)
+    try {
+        if (Test-Path -LiteralPath $shortcutPath) {
+            $shortcutBackup = Join-Path $installRoot ("shortcut-before-" + $nonce + ".lnk")
+            [System.IO.File]::Replace($tempShortcut, $shortcutPath, $shortcutBackup)
+        }
+        else {
+            [System.IO.File]::Move($tempShortcut, $shortcutPath)
+        }
+        $tempShortcut = $null
     }
-    else {
-        [System.IO.File]::Move($tempShortcut, $shortcutPath)
+    catch {
+        # A failed shortcut switch must not strand this version in a non-retryable directory.
+        $stageDir = Join-Path $installRoot ("staging-" + $nonce)
+        Move-Item -LiteralPath $releaseDir -Destination $stageDir
+        throw
     }
-    $tempShortcut = $null
 
     Write-Host "Installed PC Test revision $commit at $releaseDir. Older versions retained."
 }
