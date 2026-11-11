@@ -10,7 +10,7 @@ public partial class MainWindow : Window
     private readonly RuntimeManager runtime = new();
     private readonly string startupLogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LinguaCafePCTest",
+        "LinguaCafePCTestNext",
         "startup.log");
     private PcTestState state = null!;
 
@@ -31,7 +31,7 @@ public partial class MainWindow : Window
             UpdateStatus("正在初始化桌面窗口…");
             var profile = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LinguaCafePCTest",
+                "LinguaCafePCTestNext",
                 "WebView2");
             var webViewEnvironment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             await Browser.EnsureCoreWebView2Async(webViewEnvironment);
