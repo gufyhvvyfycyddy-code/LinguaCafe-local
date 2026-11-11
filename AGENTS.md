@@ -78,7 +78,9 @@ GPT sense-mapping 自动化边界固定为：导出 GPT 包 → 人工取得 GPT
 
 计划未写死的决定按 ADR-0034 的目标模式决策梯处理：用户当前决定 → 适用的已接受 ADR/契约/roadmap 边界 → 经核实的稳定实现先例 → 适用的 Anki 官方行为及 LinguaCafe 映射 → 最小、可逆、兼容且可测试的推荐方案。用户已委托当前 M0–M18 目标内第 4、5 步的可逆选择；执行 Agent 必须记录并验证，不得把现有代码、第三方资料或自己的偏好冒充更高权威。
 
-目标授权仍不得覆盖：开发/预发布/生产或真实用户数据上的 migration 执行、回填、恢复、删除和破坏性操作；任何 `migrate:fresh`、`migrate:refresh`、`migrate:reset`、`db:wipe`、drop 或 truncate；真实 AI provider、密钥、外发、付费、模型或成本上限；部署、签名、商店提交或其他不可逆第三方动作；未被当前目标明确委托且会实质改变产品边界、评分/生命周期/调度、数据丢失风险或关键无障碍承诺的产品选择；同一最高有效权威内的真实冲突；目标外扩张。只有这些具体决定获得用户批准后才并入当前目标。权威、产品边界、数据权威、安全模型、外发或成本假设发生实质变化时必须重新确认。依据见 ADR-0031、ADR-0034。
+一般目标授权仍不得覆盖：未经当前用户明确授权的开发/预发布/生产或真实用户数据 migration 执行、回填、恢复、删除、DROP TABLE/TRUNCATE 或整库清理；真实 AI provider、密钥外发、付费、模型或成本上限；部署、签名、商店提交或其他不可逆第三方动作；未委托的产品选择、权威冲突与目标外扩张。只有这些具体决定获得用户批准后才并入当前目标。依据见 ADR-0031、ADR-0034。
+
+**2026-11-12 仅对 LinguaCafe＋Super Productivity 唯一学习工作流的用户显式例外（长期有效）**：用户明确授予当前 MASTER 未 DONE 任务所需的产品改码、正式/旧PC Test运行、个人 SP 和私人 CalDAV 配置、受限本机环境与备份工具修复、现有真实 MariaDB `linguacafe_fsrs` 的必要迁移/数据修复及有清单的旧数据删除权限，不再因旧 `CURRENT_MILESTONE` 或交接的 `migration_execution_allowed=false`、`database_write_allowed=false`、`只允许 testing` 自动停工。现役权限细节以 `D:\AI-Tools\STUDY_WORKFLOW_MASTER_TEST_AND_HANDOFF.md` §0 和 `docs/execution/CURRENT_MILESTONE.json` 同步定义，不扩张至其他项目/数据库/非用户资料。新增的批准包括 `2026_06_17_000003_add_language_to_review_tables.php` 的 `dropUnique`（只删除旧索引以建立正确新索引，**不授权 DROP TABLE**），以及为实际运行所需的其他已审查精准 DDL/DML。执行真实库迁移前必须具备实例与 owner/独占锁证明、ACL 受限的完整数据库和有关媒体备份、隔离实例独立恢复并读回 WordSense/FSRS、精确 migration/索引/重复值审核、维护窗口及可回滚方案；仅在全部条件达标时运行。旧学习记录删除属用户许可的最后手段，优先可恢复最小修复，不允许无目标的 `migrate:fresh`、`db:wipe`、整库 DROP/TRUNCATE。工具或更高权限安全控制明确拒绝时不换表面绕过，记录 BLOCKED，推进独立已授权切片。上述是用户已批准的当前目标例外而非对一般默认安全规则的废除。
 
 新发现的实现细节若仍在已批准目标和当前切片内，先补齐架构审查、契约和验证，无需重复请求用户；低权威旧状态按 §1 自动消解。遇到保留停止线时只暂停受影响切片，并继续依赖图中其他已授权、语义独立的切片；只有所有剩余切片都依赖该事项，或最终完成审计必须由用户/外部环境清零时才请求具体确认。超出目标或同一最高有效权威仍冲突时同样按实际依赖范围暂停。依据见 ADR-0037。
 
@@ -131,14 +133,15 @@ GPT sense-mapping 自动化边界固定为：导出 GPT 包 → 人工取得 GPT
 - 浏览器验收优先使用官方 OpenAI Browser/Chrome 插件；其普通失败后才按 ADR-0033 切换下一平台允许的真实浏览器通道，不必等待用户再次批准。单一工具失败不构成 `Incomplete`。所有允许通道均失败或操作必须由人完成时，在持续目标中先记录 deferred 并继续独立切片；只有没有任何可运行切片或最终完成审计需要该动作时才请求用户。
 - 若 system、developer 或工具输出明确禁止同一结果的 workaround、间接执行、原始命令或 alternate surface，该安全拒绝高于本规则，不得换通道规避；只把普通连接/会话/进程失败按 ADR-0033 自动降级。含义不清时按更严格类别处理。
 - 为本地验收，执行 Agent 可以启动或重启任务需要的 Laravel、前端、队列、tokenizer 与浏览器进程。任何会产生写入的页面操作前，必须取得绑定同一监听 host/port 和进程的 server-bound 证据，确认该实际 HTTP 进程为 `APP_ENV=testing`、连接专用 testing 数据库并能读取 testing-only sentinel；单独运行的 PHPUnit/testing DB 健康检查只是前置条件，不能证明当前服务器。证据可由 testing-only 本地健康端点，或绑定 PID/端口的启动证明加同源 sentinel 请求提供，不得暴露凭据。默认 `php artisan serve` 或无法证明数据库指向的服务器只允许只读诊断。任务提示词提供的本地测试账号只有在确认其位于同一 testing 数据库且权限不高于当前切片所需时才能复用；否则只在该 testing 数据库建立一个最小权限、任务专属身份。随机密码只在内存中直接填入正常 UI，不进入仓库、完整 shell 参数、输出、截图、Network 报告或浏览器密码库。若本地 Android emulator 已真实渲染 UI、官方 Computer Use 无法激活其键盘且 sentinel 已绑定，可按 ADR-0053 在单一不记录日志的临时进程中生成密码，并通过 scoped ADB 逐字符 UI key event 输入；命令源码和进程参数不得出现完整密码，登录后立即清空，且不得用于现有身份、远端设备或非 testing 数据。可以创建唯一 marker 的任务数据，并执行当前切片已授权且可由 testing harness 或产品入口收口的页面动作。必须记录前后数据、token/session 和间接写入并复核清理；不得在普通开发数据库创建临时账号后直接删号，不得对普通开发数据库执行评分、Tag、Marker、导入、fixture 或其他验收写入，不得借此清库、绕过认证、修改其他用户数据或扩大到任务外写入。依据见 ADR-0034、ADR-0037、ADR-0053。
+- **现有真实学习库的运营/迁移，与 testing 写入验收分开**：以上 `APP_ENV=testing`、专用 sentinel 只针对独立测试和会写入合成记录的浏览器验收；对用户已授权的真实学习库维护，不伪造 testing 标记。必须先在真实进程/DB 绑定中确切证明数据库身份、独占使用及恢复能力，使用正式应用入口或已审查的 migration 精确执行；产品页面回归仍在独立 testing GUI 进行，不能把真库数据更改冒称合成测试成功。
 - API、数据库查询、日志与截图可以补强真实页面证据，但不能替代页面操作。禁止用 fetch/axios 直接调用写接口后声称完成了按钮验收，也禁止用数据库手工改值伪造页面结果。
 
 同时触及多个受保护模块时合并运行对应检查。失败必须如实归因；不得删测试、弱化断言、隐藏失败或扩大范围来换取通过。
 
 ## 9. Git 与交付
 
-- 不读取、修改或提交 `.env`、密钥、既有账号凭据或认证材料。ADR-0034 允许的 testing 临时身份只能使用内存随机密码和正常认证入口，不得持久化凭据。
-- 不运行 `migrate:fresh`、`migrate:refresh`、`migrate:reset`、`db:wipe`、drop、truncate 或清库；不得用 SQLite 替代 testing MySQL。
+- 默认不读取、修改 `.env`、密钥、既有账号凭据或认证材料。针对现役唯一学习工作流，用户 2026-11-12 已明确批准为正常服务连接/迁移/恢复所必需的**最小、受限本机配置核对或修复**；只能在受限本地执行、不得向聊天/外部模型/日志/测试报告回显明文，绝不提交或打包 `.env` 与密码。testing 临时身份使用最小权限，不在日志中持久化明文凭据。
+- 默认不执行 `migrate:fresh`、`migrate:refresh`、`migrate:reset`、`db:wipe`、DROP TABLE、TRUNCATE 或无目标清库；不得用 SQLite 替代 testing MySQL。**例外**：仅在本工作流当前真实库/隔离库准确身份与完整恢复证明后，允许正常 `migrate`/必要时 `migrate --force`、精确已审查索引 `dropUnique`/DROP INDEX、必要最小目标化修复与有凭据的恢复。绝不以修改规则为借口跳过 tool/平台拒绝或伪造结果。
 - 不绕过权限、认证、user/language 隔离或既有唯一写入入口。
 - 不处理 `.omo/`、无关 `.playwright-cli/` 残渣或其他任务外文件。
 - 提交前检查 branch、remote、worktree 和精确文件范围。
