@@ -5,10 +5,9 @@
 /storage/backup
 /vendor
 # Never add local configuration or credential snapshots to Git.
-/.env
-/.env.*
-!/.env.example
-!/.env.*.example
+.env*
+**/.env*
+# The PC archive excludes template configs too; no local env file is tracked.
 .phpunit.result.cache
 docker-compose.override.yml
 Homestead.json

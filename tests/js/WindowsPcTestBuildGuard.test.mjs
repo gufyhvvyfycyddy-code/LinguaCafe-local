@@ -21,19 +21,48 @@ const gitignore = read('.gitignore');
 assert.match(project, /<TargetFramework>net8\.0-windows<\/TargetFramework>/);
 assert.match(project, /<PackageReference Include="Microsoft\.Web\.WebView2" Version="1\.0\.4191\.47"/);
 
-assert.match(compose, /name: linguacafe-pc-test/);
+assert.match(compose, /name: linguacafe-pc-test-next/);
 assert.match(compose, /linguacafe-pc-test-web:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(compose, /linguacafe-pc-test-python:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(compose, /MYSQL_DATABASE: linguacafe_pc_test/);
 assert.match(compose, /127\.0\.0\.1:9391:80/);
 assert.match(compose, /127\.0\.0\.1:6001:6001/);
 assert.match(compose, /mysql-data:\/var\/lib\/mysql/);
+assert.match(compose, /PC_TEST_SOURCE_COMMIT: \$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
+assert.match(runtime, /linguacafe-pc-test-next/);
+assert.match(runtime, /LinguaCafePCTestNext/);
+for (const dockerfile of [read('docker', 'PhpDockerfile'), read('docker', 'PythonDockerfile')]) {
+  assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$PC_TEST_SOURCE_COMMIT/);
+}
 assert.match(compose, /storage-data:\/var\/www\/html\/storage/);
 assert.match(compose, /\$\{PC_TEST_ECDICT_CSV:-\.\/empty-ecdict\.csv\}:\/pc-test\/ecdict\.csv:ro/);
 assert.doesNotMatch(compose, /C:\/Users\/Administrator|C:\\\\Users\\\\Administrator/);
 assert.match(dockerignore, /^\/desktop$/m);
 assert.match(gitignore, /^\/desktop\/windows-pc-test\/bin\/$/m);
 assert.match(gitignore, /^\/desktop\/windows-pc-test\/obj\/$/m);
+assert.match(gitignore, /^\.env\*$/m);
+assert.match(dockerignore, /^\.env\*$/m);
+assert.match(dockerignore, /^\*\*\/\.env\*$/m);
+const attributes = read('.gitattributes');
+assert.match(attributes, /^\.env\* -diff export-ignore$/m);
+assert.match(attributes, /^\*\*\/\.env\* -diff export-ignore$/m);
+for (const name of ['.envrc', '.env_backup', '.env-prod', 'nested/.envrc']) {
+  const pattern = /(^|\/)\.env[^/]*/i;
+  assert.match(name, pattern, `Unsafe environment filename should be detected: ${name}`);
+}
+assert.match(installer, /ZipFile\]::OpenRead\(\$runtimeZip\)/);
+assert.match(installer, /\.env\[\^\/\]\*/);
+assert.match(installer, /unsafeCount -ne 0/);
+assert.match(installer, /ExtractToDirectory\(\$runtimeZip, \$sourceDir\)/);
+assert.match(installer, /-f \$composeFile build web python/);
+assert.match(installer, /org\.opencontainers\.image\.revision/);
+assert.match(installer, /COMPOSE_DISABLE_ENV_FILE/);
+assert.match(installer, /Push-Location \$sourceDir/);
+assert.match(installer, /LinguaCafePCTestNext/);
+assert.match(installer, /app-.*commit\.Substring/);
+assert.match(installer, /shortcut-before-/);
+assert.doesNotMatch(installer, /Remove-Item -Recurse -Force \$installDir/);
+assert.match(installer, /\[System\.IO\.File\]::Replace\(\$tempShortcut, \$shortcutPath, \$shortcutBackup\)/);
 assert.doesNotMatch(compose, /env_file:|\.env/);
 
 assert.match(runtime, /APPDATA|LocalApplicationData/);
@@ -62,12 +91,12 @@ assert.doesNotMatch(routes, /__pc-test|pc-test-login|desktop-auto-login/);
 
 assert.match(installer, /git status --porcelain=v1 --untracked-files=all/);
 assert.doesNotMatch(installer, /git diff --quiet|git diff --cached --quiet/);
-assert.match(installer, /app-staging/);
-assert.match(installer, /dotnet publish[\s\S]*-o \$stagingDir/);
+assert.match(installer, /staging-/);
+assert.match(installer, /dotnet publish[\s\S]*-o \$stageDir/);
 assert.match(installer, /git archive --format=zip --output=\$runtimeZip HEAD/);
 assert.match(installer, /\$env:PC_TEST_RUNTIME_VERSION = \$commit/);
 assert.match(installer, /docker compose[\s\S]*build web python/);
-assert.match(installer, /Move-Item -LiteralPath \$stagingDir -Destination \$installDir/);
+assert.match(installer, /Move-Item -LiteralPath \$stageDir -Destination \$releaseDir/);
 assert.match(installer, /runtime-version\.txt/);
 assert.match(installer, /LinguaCafe PC Test\.lnk/);
 assert.match(installer, /LinguaCafe PC Test\.exe/);

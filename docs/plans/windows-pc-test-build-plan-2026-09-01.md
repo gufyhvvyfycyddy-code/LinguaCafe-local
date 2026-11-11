@@ -6,6 +6,20 @@ The A–H roadmap has reached the remaining Apple physical/signing/distribution 
 
 This lane gives the product owner a real Windows desktop executable for daily hands-on testing. It reuses the canonical Laravel/Vue application instead of creating a second desktop business implementation.
 
+## Development continuation decision — 2026-11-12 (supersedes old-build startup dependency)
+
+The installed 2026-09 PC Test is historical evidence, **not the supported prerequisite** for continued LinguaCafe development. Its Web/MySQL/Redis/Python containers are stopped; past runs found stale Laravel provider cache, a schema/migration mismatch, and an old installed runtime ZIP whose filename inventory includes confidential environment configuration. Do **not** publish or revive that runtime as if it were the current reviewed source.
+
+**Authorized path, ordered by dependency:**
+
+1. Perform a bounded read-only legacy status, database/owner and port check. If startup still fails or restoring the old runtime requires modifying unclear old volumes, label **B04-LEGACY=BLOCKED**, preserve the old installation and volumes, and immediately move to the fresh-build branch. Do not spend repeated cycles on legacy recovery. Product E/F/K work can proceed independently from a current reviewed GitHub Goal source in a clean worktree.
+2. Repair the I05 packaging source pipeline before any new distribution. Exclude *all* `.env*` basenames (including `.envrc`, `.env_backup`, `.env-prod`, and nested copies), credentials, private keys and agent/browser artifacts from Git archives, ZIP members and Docker build context. Verify the ZIP and Web/Python image source belong to the same reviewed commit SHA. Treat an unexpected filename as a hard failure; never read or print secret content. Do not reuse the known-risk legacy installed ZIP.
+3. Build a **new** Windows WPF/WebView2 PC Test against the reviewed current Goal/product revision and a newly identified isolated Compose project/database volumes. Stage all artifacts and confirm build/ZIP integrity before switching the installed `app`. Preserve the prior installed `app`, prior backups, and previous shortcut with a recoverable changeover; never delete them beforehand. Test a second consecutive upgrade and forced failure rollback.
+4. Start the newly built PC Test through the normal WPF shell; verify the specific bound MySQL/testing instance, login and real UI Reader → dictionary → WordSense → Sense Review. For completion, check the remaining full study workflow against the unique MASTER; no HTTP-only or script-only substitutes.
+5. Keep **B04, I05 and G07 open** until their own running-installation GUI/rollback/packaging evidence passes. A new build's success does not retroactively mark the old PC Test recovered; historical I-01–I-04 refer to September 2026 and are not proof that today's installation works.
+
+Authorized by the user's explicit 2026-11-12 04:53 request. The single authority for task status and runtime permissions remains `D:\AI-Tools\STUDY_WORKFLOW_MASTER_TEST_AND_HANDOFF.md` and `docs/execution/CURRENT_MILESTONE.json`. No Git force push, publication of old secret-bearing archives, editing unrelated personal databases, or overwriting dirty original worktrees.
+
 ## Current checkpoint — 2026-09-02
 
 - Production Docker build blocker closed: Windows patch line endings are fixed and the PHP 8.4 FSRS dependency graph is now pinned by repository `Cargo.lock` + `cargo build --locked`.

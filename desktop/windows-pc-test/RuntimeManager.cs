@@ -15,7 +15,7 @@ public sealed class RuntimeManager
     private string runtimeImageTag = "dev";
     private readonly string appDataRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LinguaCafePCTest");
+        "LinguaCafePCTestNext");
 
     public string StatePath => Path.Combine(appDataRoot, "state.json");
 
@@ -57,7 +57,7 @@ public sealed class RuntimeManager
 
         var common = new[]
         {
-            "compose", "-p", "linguacafe-pc-test", "-f", composeFile,
+            "compose", "-p", "linguacafe-pc-test-next", "-f", composeFile,
         };
 
         var canReusePackagedImages = runtimeImageTag != "dev"

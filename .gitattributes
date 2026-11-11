@@ -5,10 +5,28 @@
 CHANGELOG.md export-ignore
 
 # Keep local configuration and credential snapshots out of source archives.
-.env -diff export-ignore
-.env.* -diff export-ignore
-.env.example -export-ignore
-.env.*.example -export-ignore
+.env* -diff export-ignore
+**/.env* -diff export-ignore
+*.pem -diff export-ignore
+**/*.pem -diff export-ignore
+*.key -diff export-ignore
+**/*.key -diff export-ignore
+*secret* -diff export-ignore
+**/*secret* -diff export-ignore
+credentials* -diff export-ignore
+**/credentials* -diff export-ignore
+.secrets/** export-ignore
+**/.secrets/** export-ignore
+.playwright-cli/** export-ignore
+**/.playwright-cli/** export-ignore
+.codex/** export-ignore
+**/.codex/** export-ignore
+.claude/** export-ignore
+**/.claude/** export-ignore
+.omo/** export-ignore
+**/.omo/** export-ignore
+.reasonix/** export-ignore
+**/.reasonix/** export-ignore
 /public/images/flags/** export-ignore
 
 # make sure executable/build-control text has the right line endings
