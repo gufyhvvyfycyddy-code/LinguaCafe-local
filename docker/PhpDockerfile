@@ -43,6 +43,8 @@ COPY ./ /build
 RUN npm run prod
 
 FROM php:8.4-apache-trixie
+ARG PC_TEST_SOURCE_COMMIT=dev
+LABEL org.opencontainers.image.revision=$PC_TEST_SOURCE_COMMIT
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \

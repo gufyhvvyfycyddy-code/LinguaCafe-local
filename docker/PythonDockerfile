@@ -1,4 +1,6 @@
 FROM ubuntu:22.04
+ARG PC_TEST_SOURCE_COMMIT=dev
+LABEL org.opencontainers.image.revision=$PC_TEST_SOURCE_COMMIT
 
 WORKDIR /app
 RUN apt-get update -y \

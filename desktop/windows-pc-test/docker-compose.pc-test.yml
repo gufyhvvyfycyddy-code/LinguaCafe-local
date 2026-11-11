@@ -1,4 +1,4 @@
-name: linguacafe-pc-test
+name: linguacafe-pc-test-next
 
 networks:
   pc-test:
@@ -41,6 +41,8 @@ services:
     build:
       context: ../..
       dockerfile: docker/PythonDockerfile
+      args:
+        PC_TEST_SOURCE_COMMIT: ${PC_TEST_RUNTIME_VERSION:-dev}
     image: linguacafe-pc-test-python:${PC_TEST_RUNTIME_VERSION:-dev}
     restart: unless-stopped
     command: ["python3", "/app/tokenizer.py"]
@@ -51,6 +53,8 @@ services:
     build:
       context: ../..
       dockerfile: docker/PhpDockerfile
+      args:
+        PC_TEST_SOURCE_COMMIT: ${PC_TEST_RUNTIME_VERSION:-dev}
     image: linguacafe-pc-test-web:${PC_TEST_RUNTIME_VERSION:-dev}
     restart: unless-stopped
     depends_on:

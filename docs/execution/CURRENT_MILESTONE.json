@@ -13,7 +13,8 @@
     "handoff": "docs/plans/codex-final-handoff-2026-08-04.md"
   },
   "allowed_work": [
-    "B04/B05: launch and repair an isolated PC Test with distinct DB/volumes, verify login through real browser; recover or repair existing PC Test only after owner/data identity and backup validation",
+    "B04: if old PC Test cannot start safely, continue implementation and rebuild a new isolated PC Test from reviewed current Goal source with new volumes and real WPF/WebView2/browser login smoke; old runtime recovery is NOT a prerequisite",
+    "I05: repair PC packaging on a CLEAN current-source worktree: deny .env* incl .envrc/.env_backup/.env-prod and nested names, secrets and agent artifacts across git archive/ZIP and Docker context; build ZIP/images from one commit SHA, stage before switch, retain old app and backups, verify repeat upgrades and rollback",
     "B04/B06: EXACT host MariaDB3306 linguacafe_fsrs is fully disposable DEV database, including its test user/session tables; after same-run database identity and exclusive owner verification, permit scoped or whole-schema migration/reset (migrate:fresh/db:wipe), DDL/DML and reseeding without full restore. Other PC Test volumes retain their separate previously authorized scope and do not inherit this whole-schema reset permission.",
     "B04: authorize exact historical migration 2026_06_17_000003_add_language_to_review_tables.php including dropUnique/DROP INDEX as needed for correct sense review index semantics, after duplicate preflight and recovery rehearsal",
     "B06/K02/I05: repair/recover tools and packaging in clean isolated worktree; local LinguaCafe dev test records may be reset or discarded, unrelated personal software and all other DBs remain protected",
@@ -47,7 +48,7 @@
   "scoped_environment_config_repair_allowed": true,
   "scoped_windows_service_and_acl_repair_allowed": true,
   "scoped_backup_restore_allowed": true,
-  "authorized_scope_note": "User 2026-11-12 02:39 explicitly confirms ALL existing LinguaCafe host linguacafe_fsrs database content consists of disposable development test data. This exact schema can be rebuilt after a short preflight, no full restore needed; readiness flag remains false until same-run preflight and then can be changed by executor. Other schemas, PC Test volumes, SP/CalDAV data, secrets, platform constraints unchanged.",
+  "authorized_scope_note": "User 2026-11-12 02:39 explicitly confirms ALL existing LinguaCafe host linguacafe_fsrs database content consists of disposable development test data. This exact schema can be rebuilt after a short preflight, no full restore needed; readiness flag remains false until same-run preflight and then can be changed by executor. Other schemas, PC Test volumes, SP/CalDAV data, secrets, platform constraints unchanged. 2026-11-12 04:53 user explicitly permits bypassing broken old PC Test as a development prerequisite, continued development and NEW PC build; packaging safety and no-overwrite rollback may be repaired within reviewed exact source paths.",
   "protect_existing_user_data": true,
   "prohibit": [
     "expose/submit/commit/env-package credentials; private minimal configuration inspection only as required by this workflow",
@@ -85,5 +86,26 @@
   "protect_unrelated_databases_personal_sp_and_caldav": true,
   "development_data_protection_policy": "development: disposable test data; production mode only after explicit user declaration with new protective rules",
   "development_db_runtime_preflight_autonomous_allowed": true,
-  "development_db_disposable_scope": "ENTIRE TABLE/DATA/SCHEMA CONTENTS of only localhost MariaDB3306 database linguacafe_fsrs, including test users/sessions in that schema; not external Windows accounts, personal SP/CalDAV, other MariaDB schemas, or unrelated PC Test volumes."
+  "development_db_disposable_scope": "ENTIRE TABLE/DATA/SCHEMA CONTENTS of only localhost MariaDB3306 database linguacafe_fsrs, including test users/sessions in that schema; not external Windows accounts, personal SP/CalDAV, other MariaDB schemas, or unrelated PC Test volumes.",
+  "pc_test_legacy_start_required_for_development": false,
+  "pc_test_legacy_recovery_attempt_policy": "One bounded read-only diagnosis only. On stale cache, drifted legacy schema, broken startup or source mismatch, mark legacy FAIL and continue development using fresh current reviewed Goal code and new PC Test build; do not reuse risky legacy ZIP or volumes.",
+  "pc_test_rebuild_fallback_authorized": true,
+  "pc_test_new_runtime_source": "current independently verified GitHub Goal or reviewed integration commit (not the old installed ZIP, not dirty main)",
+  "pc_test_new_volume_isolation_required": true,
+  "pc_test_new_build_runtime_testing_gui_required": true,
+  "pc_test_installer_safe_replacement_authorized": true,
+  "pc_test_package_sensitive_file_guards": [
+    ".env* at root and nested",
+    "*.pem",
+    "*.key",
+    "*secret*",
+    "credentials*",
+    ".secrets",
+    "agent and browser artifacts"
+  ],
+  "pc_test_package_single_source_sha_required": true,
+  "pc_test_rollback_and_repeated_upgrades_required": true,
+  "pc_test_preserve_old_installs_and_backups_until_verified": true,
+  "pc_test_old_installed_zip_contains_sensitive_filename_risk": true,
+  "pc_test_public_release_authorized": false
 }
