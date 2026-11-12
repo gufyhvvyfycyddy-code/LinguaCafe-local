@@ -1,6 +1,4 @@
 FROM ubuntu:22.04
-ARG PC_TEST_SOURCE_COMMIT=dev
-LABEL org.opencontainers.image.revision=$PC_TEST_SOURCE_COMMIT
 
 WORKDIR /app
 RUN apt-get update -y \
@@ -44,3 +42,7 @@ RUN --mount=type=cache,id=linguacafe-pc-test-pip,target=/home/laravel/.cache/pip
         'https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl'
 
 COPY ./tools /app
+
+# Revision metadata must not invalidate the expensive dependency layers.
+ARG PC_TEST_SOURCE_COMMIT=dev
+LABEL org.opencontainers.image.revision=$PC_TEST_SOURCE_COMMIT

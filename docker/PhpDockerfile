@@ -46,8 +46,6 @@ COPY ./ /build
 RUN npm run prod
 
 FROM php:8.4-apache-trixie
-ARG PC_TEST_SOURCE_COMMIT=dev
-LABEL org.opencontainers.image.revision=$PC_TEST_SOURCE_COMMIT
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
@@ -110,6 +108,10 @@ RUN addgroup --gid 1000 laravel \
 USER laravel
 
 RUN composer install --optimize-autoloader --no-dev
+
+# Revision metadata must not invalidate the expensive dependency layers.
+ARG PC_TEST_SOURCE_COMMIT=dev
+LABEL org.opencontainers.image.revision=$PC_TEST_SOURCE_COMMIT
 
 ENTRYPOINT ["/var/www/html/entrypoint.sh"]
 CMD ["supervisord", "--configuration=/var/www/html/config/supervisord.conf", "--nodaemon"]
