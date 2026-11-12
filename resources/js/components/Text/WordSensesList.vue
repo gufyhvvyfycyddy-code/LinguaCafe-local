@@ -401,7 +401,7 @@ export default {
         },
         emptyForm() {
             return {
-                pos: 'verb',
+                pos: '',
                 sense_zh: '',
                 sense_en: '',
                 aliases_zh: '',
@@ -525,7 +525,7 @@ export default {
 
             return 'info';
         },
-        openAddForm(pos = 'verb', prefill = null) {
+        openAddForm(pos = '', prefill = null) {
             this.showAddForm = true;
             this.createFormSession += 1;
             this.saveError = '';
@@ -533,7 +533,7 @@ export default {
             this.prefillSource = '';
             this.createValidation = this.emptyValidationState();
             this.newForm = this.emptyForm();
-            this.newForm.pos = normalizeWordSensePos(pos) || pos || 'verb';
+            this.newForm.pos = normalizeWordSensePos(pos) || pos || '';
 
             // Snapshot current Vuex state in case store is reset (e.g. v-select click-outside)
             this.snapshot = {
@@ -584,7 +584,7 @@ export default {
         onFormSubmit(formData) {
             // Replace newForm with the submitted form data, then call the existing save logic
             this.newForm = {
-                pos: normalizeWordSensePos(formData.pos) || formData.pos || 'verb',
+                pos: normalizeWordSensePos(formData.pos) || formData.pos || '',
                 sense_zh: formData.sense_zh || '',
                 sense_en: formData.sense_en || '',
                 aliases_zh: formData.aliases_zh || '',
