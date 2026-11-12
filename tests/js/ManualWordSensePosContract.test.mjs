@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 import { pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '../..');
@@ -73,5 +74,42 @@ assert.match(component, /\$emit\(['"]word-learning-updated['"]/, 'successful cre
 assert.doesNotMatch(component, /catch[\s\S]{0,240}closeAddForm\s*\(/, 'failed saves must keep the add form open');
 const saveMethods = methodBody(component, '        createSense() {') + methodBody(component, '        saveEdit(sense) {');
 assert.doesNotMatch(saveMethods, /ReviewLog|fsrs|stage\s*[:=]\s*-\d/i, 'save methods must not copy ReviewLog, FSRS, or stage-transition logic');
+
+// Exercise the real parent/child form methods: a generic Add must require a POS choice.
+const parentMethods = ['emptyForm() {', 'emptyValidationState() {', 'hasValidationErrors(validation) {',
+    "openAddForm(pos = '', prefill = null) {", 'onFormSubmit(formData) {', 'createSense() {']
+    .map(signature => methodBody(component, `        ${signature}`)).join(',\n');
+const parent = vm.runInNewContext(`({${parentMethods}})`, {
+    normalizeWordSensePos: helper.normalizeWordSensePos,
+    validateManualSenseForm: helper.validateManualSenseForm,
+    axios: { post() { assert.fail('Invalid POS must not trigger a save request'); } },
+});
+const instance = { ...parent, createFormSession: 0, chapterId: null, sentenceIndex: null,
+    sentenceText: '', encounteredWordId: null, readingContext: null };
+instance.openAddForm();
+assert.equal(instance.newForm.pos, '', 'generic Add must not silently preselect verb');
+instance.onFormSubmit({ pos: '', sense_zh: '技术性' });
+assert.ok(instance.createValidation.fieldErrors.pos, 'missing POS must block save');
+instance.openAddForm('noun');
+assert.equal(instance.newForm.pos, 'noun', 'group Add must still prefill its POS');
+instance.openAddForm('adj', { pos: 'n', sense_zh: '名词义' });
+assert.equal(instance.newForm.pos, 'noun', 'trusted candidate POS must still normalize');
+
+const manualFormSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/ManualSenseForm.vue'), 'utf8');
+const child = vm.runInNewContext(`({${methodBody(manualFormSource, '        buildLocalForm(source) {')},
+${methodBody(manualFormSource, '        submitForm() {')}})`, {
+    validateManualSenseForm: helper.validateManualSenseForm,
+});
+assert.equal(child.buildLocalForm({}).pos, '', 'child must preserve unselected POS');
+assert.equal(child.buildLocalForm({ pos: 'verb' }).pos, 'verb', 'child must preserve explicit POS');
+let submitted = 0;
+const childInstance = { ...child, localForm: child.buildLocalForm({ sense_zh: '技术性' }),
+    $nextTick(callback) { callback(); }, focusFirstError() {}, $emit() { submitted += 1; } };
+childInstance.submitForm();
+assert.ok(childInstance.localFieldErrors.pos, 'child save button must expose missing POS');
+assert.equal(submitted, 0, 'child save button must not submit without POS');
+childInstance.localForm.pos = 'noun';
+childInstance.submitForm();
+assert.equal(submitted, 1, 'explicitly selected POS must permit submission');
 
 console.log('Manual WordSense POS and error UX contract passed.');
