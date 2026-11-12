@@ -17,6 +17,9 @@ assert.equal(patchBytes.includes(Buffer.from('\r\n')), false, 'FSRS patch must r
 assert.match(dockerfile, /COPY docker\/fsrs-rs-php-php84\.Cargo\.lock \/tmp\/fsrs-rs-php-php84\.Cargo\.lock/);
 assert.match(dockerfile, /cp \/tmp\/fsrs-rs-php-php84\.Cargo\.lock Cargo\.lock/);
 assert.match(dockerfile, /cargo build --release --locked/);
+assert.match(dockerfile, /target=\/build\/fsrs-rs-php\/target,sharing=locked/);
+assert.match(dockerfile, /cp target\/release\/libfsrs_rs_php\.so libfsrs_rs_php\.so/);
+assert.match(dockerfile, /COPY --from=fsrs_build \/build\/fsrs-rs-php\/libfsrs_rs_php\.so \/usr\/local\/lib\/linguacafe\/fsrs_rs_php\.so/);
 assert.doesNotMatch(dockerfile, /cargo update -p ext-php-rs/);
 assert.doesNotMatch(dockerfile, /Cargo\.lock' \| sha256sum -c/);
 

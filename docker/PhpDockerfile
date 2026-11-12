@@ -30,12 +30,14 @@ COPY docker/fsrs-rs-php-php84.Cargo.lock /tmp/fsrs-rs-php-php84.Cargo.lock
 # Keep pinned Cargo registry and Git downloads between interrupted builds.
 RUN --mount=type=cache,id=linguacafe-pc-test-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=linguacafe-pc-test-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=linguacafe-pc-test-cargo-target-php84-rust198,target=/build/fsrs-rs-php/target,sharing=locked \
     cd /build/fsrs-rs-php \
     && git apply --check /tmp/fsrs-rs-php-php84.patch \
     && git apply /tmp/fsrs-rs-php-php84.patch \
     && cp /tmp/fsrs-rs-php-php84.Cargo.lock Cargo.lock \
     && CARGO_NET_GIT_FETCH_WITH_CLI=true cargo build --release --locked \
-    && test -f target/release/libfsrs_rs_php.so
+    && test -f target/release/libfsrs_rs_php.so \
+    && cp target/release/libfsrs_rs_php.so libfsrs_rs_php.so
 
 FROM node:20-alpine AS node_build
 
@@ -77,7 +79,7 @@ RUN docker-php-ext-configure gd \
     && docker-php-ext-install "-j$(nproc)" gd pdo_mysql mysqli zip pcntl \
     && docker-php-source delete
 
-COPY --from=fsrs_build /build/fsrs-rs-php/target/release/libfsrs_rs_php.so /usr/local/lib/linguacafe/fsrs_rs_php.so
+COPY --from=fsrs_build /build/fsrs-rs-php/libfsrs_rs_php.so /usr/local/lib/linguacafe/fsrs_rs_php.so
 RUN printf 'extension=/usr/local/lib/linguacafe/fsrs_rs_php.so\n' > /usr/local/etc/php/conf.d/20-fsrs.ini \
     && php -r '$p=get_default_parameters(); $f=new fsrs\FSRS($p); $s=$f->next_states(null, 0.9, 0); exit(extension_loaded("fsrs-rs-php") && class_exists("fsrs\\FSRS") && count($p) === 19 && $s->get_good()->get_interval() > 0 ? 0 : 1);'
 
