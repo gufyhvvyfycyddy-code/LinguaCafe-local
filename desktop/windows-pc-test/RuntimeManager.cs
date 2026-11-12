@@ -275,7 +275,22 @@ public sealed class RuntimeManager
             ?? throw new InvalidOperationException($"Could not start {fileName}.");
         var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Cancel the actual CLI process as well as our wait. Otherwise a
+            // canceled PC build can keep an orphaned docker compose client alive.
+            if (!process.HasExited)
+            {
+                try { process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) when (process.HasExited) { }
+            }
+            await process.WaitForExitAsync(CancellationToken.None);
+            throw;
+        }
         var result = new ProcessResult(process.ExitCode, await stdoutTask, await stderrTask);
         if (throwOnFailure && result.ExitCode != 0)
         {

@@ -73,6 +73,10 @@ assert.doesNotMatch(compose, /env_file:|\.env/);
 assert.match(runtime, /APPDATA|LocalApplicationData/);
 assert.match(runtime, /runtime-version\.txt/);
 assert.match(runtime, /DockerImageMatchesRevisionAsync/);
+// Cancellation must terminate the spawned Docker CLI, not merely abandon its wait.
+assert.match(runtime, /catch \(OperationCanceledException\) when \(cancellationToken\.IsCancellationRequested\)/);
+assert.match(runtime, /process\.Kill\(entireProcessTree: true\)/);
+assert.match(runtime, /await process\.WaitForExitAsync\(CancellationToken\.None\)/);
 assert.match(runtime, /"image", "inspect", "--format", "\{\{ index \.Config\.Labels/);
 assert.match(runtime, /result\.ExitCode == 0 && result\.StandardOutput\.Trim\(\) == revision/);
 assert.match(runtime, /PC_TEST_RUNTIME_VERSION/);
