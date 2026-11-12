@@ -56,7 +56,7 @@
             @cancel="clearInlineReviewIntent"
         />
 
-        <v-snackbar v-model="readerNotice.show" :color="readerNotice.color" :timeout="5000" top>
+        <v-snackbar v-model="readerNotice.show" :color="readerNotice.color" :timeout="readerNotice.persistent ? -1 : 5000" top>
             {{ readerNotice.text }}
         </v-snackbar>
 
@@ -506,6 +506,7 @@
                 readingContinuityInFlightIndex: null,
                 readingContinuitySaveTimer: null,
                 readingContinuityWriteInFlight: false,
+                readingContinuityWriteNeedsRetry: false,
                 readingContinuityScrollElement: null,
                 readingContinuityLayoutSuppressUntil: 0,
                 readingContinuityLayoutRestoreTimer: null,
@@ -540,7 +541,7 @@
                 inlineUndoRequestId: '',
                 inlineUndoSnackbar: { show: false, text: '' },
                 pendingManualSenseContinuation: null,
-                readerNotice: { show: false, text: '', color: 'info' },
+                readerNotice: { show: false, text: '', color: 'info', persistent: false },
 
                 // source highlight
                 sourceHighlightTimer: null,
@@ -815,6 +816,7 @@
                     && (canonicalTokenIndex === this.readingContinuityLastSavedIndex
                         || canonicalTokenIndex === this.readingContinuityInFlightIndex)) return true;
                 this.readingContinuityPendingIndex = canonicalTokenIndex;
+                this.readingContinuityWriteNeedsRetry = false;
                 this.writePendingReadingContinuityPosition();
                 return true;
             },
@@ -838,6 +840,11 @@
                         if (data.source_revision === sourceRevision
                             && Number(data.canonical_token_index) === canonicalTokenIndex) {
                             this.readingContinuityLastSavedIndex = canonicalTokenIndex;
+                            if (this.readerNotice.persistent) this.readerNotice.show = false;
+                        } else if (this.readingContinuitySourceRevision === sourceRevision) {
+                            this.readingContinuityWriteNeedsRetry = true;
+                            if (this.readingContinuityPendingIndex === null) this.readingContinuityPendingIndex = canonicalTokenIndex;
+                            this.setReaderNotice('阅读位置暂未确认保存。请恢复网络后继续滚动以重试。', 'warning', true);
                         }
                     })
                     .catch((error) => {
@@ -852,19 +859,24 @@
                             this.readingContinuityPendingIndex = null;
                             this.detachReadingContinuityListeners();
                             this.setReaderNotice('当前阅读位置无法映射到文章的稳定词位置。已停止保存阅读位置，请刷新本章后重试。', 'warning');
+                        } else if (this.readingContinuitySourceRevision === sourceRevision) {
+                            this.readingContinuityWriteNeedsRetry = true;
+                            if (this.readingContinuityPendingIndex === null) this.readingContinuityPendingIndex = canonicalTokenIndex;
+                            this.setReaderNotice('阅读位置尚未保存。请检查网络，恢复后继续滚动以重试。', 'warning', true);
                         }
                     })
                     .finally(() => {
                         this.readingContinuityInFlightIndex = null;
                         this.readingContinuityWriteInFlight = false;
-                        if (this.readingContinuityPendingIndex !== null
+                        if (!this.readingContinuityWriteNeedsRetry
+                            && this.readingContinuityPendingIndex !== null
                             && this.readingContinuityPendingIndex !== this.readingContinuityLastSavedIndex) {
                             this.writePendingReadingContinuityPosition();
                         }
                     });
             },
-            setReaderNotice(text, color = 'info') {
-                this.readerNotice = { show: true, text, color };
+            setReaderNotice(text, color = 'info', persistent = false) {
+                this.readerNotice = { show: true, text, color, persistent };
             },
             setPendingManualSenseContinuation(continuation) {
                 this.pendingManualSenseContinuation = continuation;

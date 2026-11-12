@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import vm from 'node:vm';
 
 import {
     buildReaderExplicitRatingActionCommand,
@@ -122,6 +123,69 @@ test('reading continuity accepts only current-revision resume data and writes th
     ]);
     assert.equal(buildReadingProgressRequest('', 20), null);
     assert.equal(buildReadingProgressRequest('rev-2', -1), null);
+});
+
+test('Reader keeps an uncertain reading position until a later user scroll retries', async () => {
+    const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
+    const start = reader.indexOf('            queueReadingContinuityWrite(canonicalTokenIndex) {');
+    const end = reader.indexOf("            setReaderNotice(text, color = 'info', persistent = false) {", start);
+    assert.ok(start > 0 && end > start, 'Reader continuity request methods are present');
+    const requests = [];
+    const notices = [];
+    const slice = reader.slice(start, end).trim().replace(/,$/, '');
+    const methods = vm.runInNewContext('({' + slice + '})', {
+        buildReadingProgressRequest,
+        axios: { put: (url, payload) => new Promise((resolve, reject) => {
+            requests.push({ url, payload, resolve, reject });
+        }) },
+    });
+    const state = {
+        chapterId: 42,
+        readingContinuitySourceRevision: 'revision',
+        readingContinuityLastSavedIndex: 2,
+        readingContinuityPendingIndex: null,
+        readingContinuityInFlightIndex: null,
+        readingContinuityWriteInFlight: false,
+        readingContinuityWriteNeedsRetry: false,
+        readerNotice: { show: false, text: '', persistent: false },
+        writePendingReadingContinuityPosition: methods.writePendingReadingContinuityPosition,
+        setReaderNotice: (message, type, persistent = false) => {
+            notices.push({ message, type, persistent });
+            state.readerNotice = { show: true, text: message, color: type, persistent };
+        },
+        detachReadingContinuityListeners: () => { throw new Error('Unexpected detach'); },
+    };
+    state.queueReadingContinuityWrite = methods.queueReadingContinuityWrite;
+
+    state.queueReadingContinuityWrite(10);
+    assert.equal(requests.length, 1);
+    assert.deepEqual(requests[0].payload, { source_revision: 'revision', canonical_token_index: 10 });
+    requests[0].reject({ response: { status: 503 } });
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    assert.equal(state.readingContinuityPendingIndex, 10);
+    assert.equal(state.readingContinuityWriteNeedsRetry, true);
+    assert.equal(state.readingContinuityWriteInFlight, false);
+    assert.equal(requests.length, 1, 'not an uncontrolled retry loop');
+    assert.match(notices[0].message, /尚未保存/);
+    assert.equal(notices[0].persistent, true);
+    assert.equal(state.readerNotice.show, true);
+
+    state.queueReadingContinuityWrite(12); // a subsequent real scroll, not a timer loop
+    assert.equal(requests.length, 2);
+    requests[1].resolve({ data: { source_revision: 'revision', canonical_token_index: 12 } });
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    assert.equal(state.readingContinuityLastSavedIndex, 12);
+    assert.equal(state.readingContinuityPendingIndex, null);
+    assert.equal(state.readingContinuityWriteNeedsRetry, false);
+    assert.equal(state.readerNotice.show, false, 'confirmed save dismisses the persistent warning');
+
+    state.queueReadingContinuityWrite(13);
+    requests[2].resolve({ data: { source_revision: 'unrelated', canonical_token_index: 13 } });
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    assert.equal(state.readingContinuityLastSavedIndex, 12, 'mismatched reply is not an acknowledgment');
+    assert.equal(state.readingContinuityPendingIndex, 13);
+    assert.equal(state.readingContinuityWriteNeedsRetry, true);
+    assert.equal(requests.length, 3);
 });
 
 test('server owns monotonic furthest by canonical rank while Reader remains latest-only', () => {
