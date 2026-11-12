@@ -31,7 +31,7 @@ RUN cd /build/fsrs-rs-php \
     && git apply --check /tmp/fsrs-rs-php-php84.patch \
     && git apply /tmp/fsrs-rs-php-php84.patch \
     && cp /tmp/fsrs-rs-php-php84.Cargo.lock Cargo.lock \
-    && cargo build --release --locked \
+    && CARGO_NET_GIT_FETCH_WITH_CLI=true cargo build --release --locked \
     && test -f target/release/libfsrs_rs_php.so
 
 FROM node:20-alpine AS node_build
