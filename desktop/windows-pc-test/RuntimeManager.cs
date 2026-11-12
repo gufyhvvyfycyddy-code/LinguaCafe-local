@@ -60,9 +60,11 @@ public sealed class RuntimeManager
             "compose", "-p", "linguacafe-pc-test-next", "-f", composeFile,
         };
 
+        var webImage = $"linguacafe-pc-test-web:{runtimeImageTag}";
+        var pythonImage = $"linguacafe-pc-test-python:{runtimeImageTag}";
         var canReusePackagedImages = runtimeImageTag != "dev"
-            && await DockerImageExistsAsync($"linguacafe-pc-test-web:{runtimeImageTag}", cancellationToken)
-            && await DockerImageExistsAsync($"linguacafe-pc-test-python:{runtimeImageTag}", cancellationToken);
+            && await DockerImageMatchesRevisionAsync(webImage, runtimeImageTag, cancellationToken)
+            && await DockerImageMatchesRevisionAsync(pythonImage, runtimeImageTag, cancellationToken);
         if (canReusePackagedImages)
         {
             report($"正在复用 PC 测试运行时 {runtimeImageTag[..12]}…");
@@ -71,6 +73,12 @@ public sealed class RuntimeManager
         {
             report("首次运行或版本更新：正在构建 LinguaCafe PC 测试运行时…");
             await RunDockerAsync([.. common, "build", "web", "python"], runtimeRoot, cancellationToken);
+        }
+        if (runtimeImageTag != "dev"
+            && (!await DockerImageMatchesRevisionAsync(webImage, runtimeImageTag, cancellationToken)
+                || !await DockerImageMatchesRevisionAsync(pythonImage, runtimeImageTag, cancellationToken)))
+        {
+            throw new InvalidOperationException("PC test Docker image revision does not match the packaged source.");
         }
 
         report("正在启动独立 MySQL / Redis / tokenizer…");
@@ -122,15 +130,15 @@ public sealed class RuntimeManager
         return version.ToLowerInvariant();
     }
 
-    private static async Task<bool> DockerImageExistsAsync(string image, CancellationToken cancellationToken)
+    private static async Task<bool> DockerImageMatchesRevisionAsync(string image, string revision, CancellationToken cancellationToken)
     {
         var result = await RunProcessAsync(
             "docker",
-            ["image", "inspect", image],
+            ["image", "inspect", "--format", "{{ index .Config.Labels \"org.opencontainers.image.revision\" }}", image],
             null,
             cancellationToken,
             throwOnFailure: false);
-        return result.ExitCode == 0;
+        return result.ExitCode == 0 && result.StandardOutput.Trim() == revision;
     }
 
     private string ResolveRuntimeRoot()

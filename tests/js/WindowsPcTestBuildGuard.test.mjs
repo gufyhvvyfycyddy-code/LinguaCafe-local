@@ -72,7 +72,9 @@ assert.doesNotMatch(compose, /env_file:|\.env/);
 
 assert.match(runtime, /APPDATA|LocalApplicationData/);
 assert.match(runtime, /runtime-version\.txt/);
-assert.match(runtime, /DockerImageExistsAsync/);
+assert.match(runtime, /DockerImageMatchesRevisionAsync/);
+assert.match(runtime, /"image", "inspect", "--format", "\{\{ index \.Config\.Labels/);
+assert.match(runtime, /result\.ExitCode == 0 && result\.StandardOutput\.Trim\(\) == revision/);
 assert.match(runtime, /PC_TEST_RUNTIME_VERSION/);
 assert.match(runtime, /runtimeImageTag != "dev"/);
 assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "120", "mysql", "redis", "python"/);
