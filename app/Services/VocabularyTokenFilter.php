@@ -32,6 +32,11 @@ class VocabularyTokenFilter
             return true;
         }
 
+        // A whole source URL, email or local file path is context, not a vocabulary item.
+        if ($language === 'english' && preg_match('~^(?:https?://\S+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|[A-Za-z]:[\\\\/]\S+)$~i', $token)) {
+            return true;
+        }
+
         $lowerToken = mb_strtolower($token, 'UTF-8');
 
         if (in_array($lowerToken, self::CONTRACTION_FRAGMENTS, true)) {

@@ -51,6 +51,24 @@ class EnglishFallbackTokenizerServiceTest extends TestCase
         $this->assertSame('go', $lemmas['goes']);
     }
 
+    public function test_fallback_keeps_source_references_whole_without_losing_surrounding_words(): void
+    {
+        $tokens = $this->service()->tokenize(
+            'Read https://example.org/entry, email editor@example.org and open C:/docs/article.txt today.',
+            fn (): bool => false,
+            fn (string $word): bool => false,
+        );
+        $surfaces = array_map(fn (\stdClass $token): string => $token->w, $tokens);
+        $this->assertContains('https://example.org/entry', $surfaces);
+        $this->assertContains('editor@example.org', $surfaces);
+        $this->assertContains('C:/docs/article.txt', $surfaces);
+        $this->assertContains('Read', $surfaces);
+        $this->assertContains('today', $surfaces);
+        $this->assertNotContains('https', $surfaces);
+        $this->assertNotContains('editor', $surfaces);
+        $this->assertNotContains('docs', $surfaces);
+    }
+
     public function test_tokenize_uses_read_only_ecdict_callbacks_for_ies_candidates(): void
     {
         $known = array_fill_keys(['technology', 'brownie'], true);
