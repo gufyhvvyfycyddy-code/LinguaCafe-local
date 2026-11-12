@@ -25,7 +25,8 @@ class EnglishFallbackTokenizerService
         );
 
         foreach ($sentences as $sentence) {
-            preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $sentence, $matches);
+            // Keep references intact so the vocabulary filter can reject them as a whole.
+            preg_match_all('~https?://[^\s<>]+(?<![.,!?;:])|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|[A-Za-z]:[\\\\/][^\s<>]+(?<![.,!?;:])|[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]~u', $sentence, $matches);
 
             foreach ($matches[0] ?? [] as $surface) {
                 if ($surface === '') {

@@ -14,6 +14,16 @@ class VocabularyTokenFilterTest extends TestCase
         }
     }
 
+    public function test_it_excludes_whole_source_references_but_not_surrounding_prose(): void
+    {
+        foreach (['https://example.org/entry', 'editor@example.org', 'C:/docs/article.txt', 'C:\\\\docs\\\\article.txt'] as $reference) {
+            $this->assertTrue(VocabularyTokenFilter::shouldSkip($reference, 'english'), $reference);
+        }
+        foreach (['entry', 'editor', 'article', 'read'] as $ordinaryWord) {
+            $this->assertFalse(VocabularyTokenFilter::shouldSkip($ordinaryWord, 'english'), $ordinaryWord);
+        }
+    }
+
     public function test_it_keeps_normal_english_words_and_full_contractions(): void
     {
         foreach (['charge', 'charged', "don't", "we're", "it's", 'brick-and-mortar'] as $token) {
