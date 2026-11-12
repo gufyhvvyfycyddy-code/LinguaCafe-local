@@ -262,6 +262,9 @@ test('TextBlockGroup delegates presentation while retaining the token DOM bounda
     assert.equal(textBlockSource.includes('@mousedown.stop="startSelectionMouseEvent"'), true);
     assert.equal(textBlockSource.includes('@mouseup.stop="finishSelection"'), true);
     assert.equal(textBlockSource.includes('<template v-for="(word, wordIndex) in words"><!--'), true);
+    // Ordinary English Reader text must contain a real space, not CSS-only spacing.
+    assert.equal(textBlockSource.includes(`v-if="word.spaceAfter && (plainTextMode || $props.language === 'english')">{{ plainTextMode ? '\\u00a0' : ' ' }}</template>`), true);
+    assert.equal(textBlockSource.includes('v-if="plainTextMode && word.spaceAfter"'), false);
 });
 
 test('Reader defaults saved sentence translations to visible but preserves the manual toggle', () => {

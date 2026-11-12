@@ -307,6 +307,10 @@ fallback 必须在 `PARAGRAPH_BREAK`、`NEWLINE` 和 section marker 处结束当
 
 在不破坏逐词点击和短语高亮的前提下，让需要空格的 token 在 DOM 中包含真实空白文本节点。不能只继续增加 CSS margin。
 
+#### 2026-11-12 最小候选（待真实阅读页验收）
+- 独立审查分支 `task/k02-b007-reader-dom-spaces-20261112`：普通英文阅读词元的 `spaceAfter` 在原有逐词 span 内输出真实 ASCII 空格；`plainTextMode` 原 `NBSP` 保留，非英文普通阅读不改；没有修改原 `wordindex`、点击事件、Vuex、CSS margin、WordSense/FSRS。
+- 现有 ReaderTokenPresentationPolicy 17/17、ReaderPhaseASafetyGuard 8/8、ReaderDragSelectionPolicy 12/12 通过，Vue Laravel Mix开发编译成功。静态合同和编译不能证明真实 DOM 复制、屏幕阅读器或短语高亮几何效果；**FIXED-WAITING-VERIFY，B-007 不关闭**，只有在登录后的阅读页真实操作、普通/纯文本模式复制、空格语义和拖选/高亮全部通过后才可正式验收。
+
 ### [Bug][后端问题][P1] B-008 Jellyfin 缺失设置导致普通导入窗口返回 500
 
 #### 现象
