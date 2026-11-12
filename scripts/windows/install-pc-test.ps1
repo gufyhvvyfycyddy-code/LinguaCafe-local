@@ -42,7 +42,7 @@ try {
         # Inspect names only: no secret file contents are opened, logged or uploaded.
         $forbiddenName = '(?i)(^|/)(\.env[^/]*|[^/]*\.pem|[^/]*\.key|[^/]*secret[^/]*|credentials[^/]*|\.secrets|\.playwright-cli|\.codex|\.claude|\.omo|\.reasonix)(/|$)'
         $unsafeCount = @($archive.Entries | Where-Object {
-            ($_.FullName -replace '\\', '/') -match $forbiddenName
+            $_.Name -ne '' -and (($_.FullName -replace '\\', '/') -match $forbiddenName)
         }).Count
         if ($unsafeCount -ne 0) {
             throw "PC archive rejected: $unsafeCount disallowed file or directory names."

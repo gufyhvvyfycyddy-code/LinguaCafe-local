@@ -116,6 +116,33 @@ if (process.platform === 'win32') {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'lc-i05-switch-'));
   const quote = (s) => "'" + s.replaceAll("'", "''") + "'";
   try {
+    // Exercise the installer scanner against a real ZIP: empty excluded directory
+    // entries are harmless, while nested secret files must still fail closed.
+    const scanStart = installer.indexOf('        $forbiddenName = ');
+    const scanEnd = installer.indexOf('        if ($unsafeCount -ne 0)', scanStart);
+    assert.ok(scanStart >= 0 && scanEnd > scanStart, 'archive filename scanner missing');
+    const scanner = installer.slice(scanStart, scanEnd);
+    const scanFile = path.join(temp, 'archive-scan.ps1');
+    fs.writeFileSync(scanFile, `$ErrorActionPreference='Stop'
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+foreach ($unsafe in @($false, $true)) {
+  $zipPath = Join-Path ${quote(temp)} ($unsafe.ToString() + '.zip')
+  $zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+  [void]$zip.CreateEntry('.playwright-cli/')
+  [void]$zip.CreateEntry('safe.txt')
+  if ($unsafe) { [void]$zip.CreateEntry('nested/.envrc') }
+  $zip.Dispose()
+  $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+${scanner}
+  $archive.Dispose()
+  if ($unsafeCount -ne [int]$unsafe) { throw 'Archive scan did not distinguish empty directory from secret file' }
+}
+`, 'utf8');
+    const scanResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', scanFile],
+      { encoding: 'utf8', timeout: 20000, windowsHide: true });
+    assert.equal(scanResult.status, 0, `archive scan: ${scanResult.stderr || scanResult.stdout || scanResult.error}`);
+
     for (const fail of [false, true]) {
       const rootDir = path.join(temp, fail ? 'fail' : 'success');
       const stageDir = path.join(rootDir, 'staging-test');
