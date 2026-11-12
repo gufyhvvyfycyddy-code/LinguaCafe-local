@@ -41,8 +41,9 @@ RUN --mount=type=cache,id=linguacafe-pc-test-pip,target=/home/laravel/.cache/pip
         pinyin \
 #subtitle file parser
         pysub-parser \
-#website text parser
-        newspaper3k \
+#website text parser — pinned to the working PC Test image version;
+# avoid pip backtracking to obsolete Pillow 2.x / Python-incompatible releases.
+        'newspaper3k==0.2.8' \
         'https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl'
 
 COPY ./tools /app
