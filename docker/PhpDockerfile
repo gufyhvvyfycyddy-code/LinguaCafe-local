@@ -27,7 +27,10 @@ RUN git init fsrs-rs-php \
     && git checkout --detach FETCH_HEAD
 COPY docker/fsrs-rs-php-php84.patch /tmp/fsrs-rs-php-php84.patch
 COPY docker/fsrs-rs-php-php84.Cargo.lock /tmp/fsrs-rs-php-php84.Cargo.lock
-RUN cd /build/fsrs-rs-php \
+# Keep pinned Cargo registry and Git downloads between interrupted builds.
+RUN --mount=type=cache,id=linguacafe-pc-test-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=linguacafe-pc-test-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    cd /build/fsrs-rs-php \
     && git apply --check /tmp/fsrs-rs-php-php84.patch \
     && git apply /tmp/fsrs-rs-php-php84.patch \
     && cp /tmp/fsrs-rs-php-php84.Cargo.lock Cargo.lock \

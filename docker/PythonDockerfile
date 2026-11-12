@@ -16,7 +16,9 @@ RUN addgroup --gid 1000 laravel \
     && adduser --ingroup laravel --disabled-password --gecos "" --shell /bin/sh laravel
 USER laravel
 
-RUN pip install -U --no-cache-dir \
+# Preserve downloaded wheels across interrupted PC-test builds (runtime stays unchanged).
+RUN --mount=type=cache,id=linguacafe-pc-test-pip,target=/home/laravel/.cache/pip,uid=1000,gid=1000 \
+    pip install -U \
         setuptools \
         wheel \
         lxml \
