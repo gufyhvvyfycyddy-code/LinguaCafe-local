@@ -104,7 +104,7 @@
                         --></ruby>
                     </template><!--
                     --><template v-else>{{ word.word }}</template><!--
-                    --><template v-if="plainTextMode && word.spaceAfter">&nbsp;</template><!--
+                    --><template v-if="word.spaceAfter && (plainTextMode || $props.language === 'english')">{{ plainTextMode ? '\u00a0' : ' ' }}</template><!--
                 --></span><!--
                 --><div
                     v-if="!word.is_structure && isLastWordOfSentence(wordIndex) && getAiTranslation(word.sentence_index)"
