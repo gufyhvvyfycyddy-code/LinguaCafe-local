@@ -183,6 +183,11 @@ LinguaCafe 中的 Jellyfin 功能只用于一种可选导入方式：从 Jellyfi
 
 新建账号后第一次进入首页，统计请求必须直接返回 200；连续并发请求也不能出现空目标异常。
 
+#### 2026-11-12 现役代码复核（历史原因已过时，真实 GUI 待验）
+- 现役 `app/Services/StatisticsService.php::getStatistics()` 已改为 FSRS Statistics V3 的卡片查询与统计，不再查询或解引用 `$readingGoal->id`；`app/Http/Controllers/HomeController.php::getStatistics()` 仍调用该服务。
+- 现有 `tests/Feature/M14StatisticsCardInfoTest.php` 中有直接创建用户、不创建 `read_words` 目标即调用 `/statistics/get` 并断言 200 的测试代码；**本次只核对测试源码，未实际运行该 PHP 集成测试**，也没有完成新账号第一次真实浏览器登录或并发请求验收。
+- 状态：**HISTORICAL_ROOT_ABSENT / GUI-WAITING-VERIFY**。原文“精确原因”是当时的历史代码解释，不能直接认作现在仍存在的缺陷；不得因为源码改了就标记 B-002 CLOSED，后续以当前版本的首次登录实测复核。
+
 ### [Bug][体验][P1] B-003 生僻词悬浮卡为空白
 
 #### 现象
