@@ -62,7 +62,8 @@
                 </li>
             </template>
 
-            <li v-if="!userTranslationList.length && !dictionaryTranslationList.length
+            <li v-if="!userTranslationList.length
+                && (!dictionaryTranslationList.length || dictionaryTranslation === 'dictionary-search-disabled')
                 && dictionaryTranslation !== 'loading' && apiTranslations[0] !== 'loading'
                 && (!apiTranslations.length || apiTranslations[0] === 'error')">
                 {{ apiTranslations[0] === 'error'
