@@ -15,8 +15,9 @@ RUN addgroup --gid 1000 laravel \
 USER laravel
 
 # Preserve downloaded wheels across interrupted PC-test builds (runtime stays unchanged).
+# Allow official PyPI CDN downloads to survive slow reads without changing sources.
 RUN --mount=type=cache,id=linguacafe-pc-test-pip,target=/home/laravel/.cache/pip,uid=1000,gid=1000 \
-    pip install -U \
+    pip --timeout 180 --retries 8 install -U \
         setuptools \
         wheel \
         lxml \
