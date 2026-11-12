@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 import { resolveHoverVocabularyLookup } from '../../resources/js/services/HoverVocabularyLookupPolicy.js';
@@ -88,6 +89,51 @@ test('does not mutate frozen hover inputs', () => {
         normalizeLemma,
     }));
     assert.deepEqual(hoveredWords, [word]);
+});
+
+test('dictionary request failure clears loading only for the currently hovered word', async () => {
+    const start = textBlockSource.indexOf('            makeHoverVocabularyBoxSearchRequest(term) {');
+    const end = textBlockSource.indexOf('            unselectAllWordsOnEmptyClick(event) {', start);
+    assert.ok(start >= 0 && end > start);
+    const sourceMethod = textBlockSource.slice(start, end).trim().replace(/,$/, '');
+    let rejectRequest;
+    const request = new Promise((resolve, reject) => { rejectRequest = reject; });
+    const lookup = vm.runInNewContext(`({${sourceMethod}})`, {
+        ReaderLookupApi: { searchReaderHoverDictionary: () => request },
+        ReaderLookupResponse: {},
+    }).makeHoverVocabularyBoxSearchRequest;
+    const state = { dictionarySearchTerm: '', dictionaryTranslation: 'loading', key: 0 };
+    let repositioned = 0;
+    const owner = {
+        $props: { vocabularyHoverBoxSearch: true, language: 'english' }, selection: [], anyApiDictionaryEnabled: false,
+        $store: { state: { hoverVocabularyBox: state }, commit: (name, { propertyName, value }) => { state[propertyName] = value; } },
+        $nextTick: (callback) => callback(), updateHoverVocabularyBoxPosition: () => { repositioned++; },
+    };
+    lookup.call(owner, 'Technicity');
+    rejectRequest(new Error('offline'));
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(state.dictionaryTranslation, 'dictionary-search-error');
+    assert.equal(state.key, 1);
+    assert.equal(repositioned, 1);
+
+    const staleState = { dictionarySearchTerm: '', dictionaryTranslation: 'loading', key: 0 };
+    let rejectStale;
+    const staleRequest = new Promise((resolve, reject) => { rejectStale = reject; });
+    const staleLookup = vm.runInNewContext(`({${sourceMethod}})`, {
+        ReaderLookupApi: { searchReaderHoverDictionary: () => staleRequest }, ReaderLookupResponse: {},
+    }).makeHoverVocabularyBoxSearchRequest;
+    owner.$store.state.hoverVocabularyBox = staleState;
+    owner.$store.commit = (name, { propertyName, value }) => { staleState[propertyName] = value; };
+    staleLookup.call(owner, 'Old');
+    staleState.dictionarySearchTerm = 'new';
+    rejectStale(new Error('late failure'));
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(staleState.dictionaryTranslation, 'loading');
+    assert.equal(staleState.key, 0);
+
+    const hoverSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/VocabularyHoverBox.vue'), 'utf8');
+    assert.match(hoverSource, /dictionary-search-error/);
+    assert.match(hoverSource, /查询失败，请点击查看详细释义/);
 });
 
 test('TextBlockGroup delegates hover decisions while using the dedicated request owner', () => {

@@ -1377,6 +1377,11 @@
                     this.$nextTick(() => {
                         this.updateHoverVocabularyBoxPosition();
                     });
+                }).catch(() => {
+                    if (this.$store.state.hoverVocabularyBox.dictionarySearchTerm !== term) return;
+                    this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'dictionaryTranslation', value: 'dictionary-search-error' });
+                    this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'key', value: this.$store.state.hoverVocabularyBox.key + 1 });
+                    this.$nextTick(() => this.updateHoverVocabularyBoxPosition());
                 });
 
                 // make api search

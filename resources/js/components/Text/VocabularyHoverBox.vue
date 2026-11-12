@@ -42,7 +42,7 @@
             </template>
 
             <!-- Dictionary translations -->
-            <template v-if="!['loading', 'dictionary-search-disabled'].includes(dictionaryTranslation) && dictionaryTranslationList.length">
+            <template v-if="!['loading', 'dictionary-search-disabled', 'dictionary-search-error'].includes(dictionaryTranslation) && dictionaryTranslationList.length">
                 <li v-for="(translation, translationIndex) in dictionaryTranslationList" :key="'dictionary-' + translationIndex">
                     <v-icon small>mdi-list-box</v-icon> {{ translation }}
                 </li>
@@ -63,10 +63,10 @@
             </template>
 
             <li v-if="!userTranslationList.length
-                && (!dictionaryTranslationList.length || dictionaryTranslation === 'dictionary-search-disabled')
+                && (!dictionaryTranslationList.length || ['dictionary-search-disabled', 'dictionary-search-error'].includes(dictionaryTranslation))
                 && dictionaryTranslation !== 'loading' && apiTranslations[0] !== 'loading'
                 && (!apiTranslations.length || apiTranslations[0] === 'error')">
-                {{ apiTranslations[0] === 'error'
+                {{ apiTranslations[0] === 'error' || dictionaryTranslation === 'dictionary-search-error'
                     ? '查询失败，请点击查看详细释义。'
                     : dictionaryTranslation === 'dictionary-search-disabled'
                         ? '词典查询未开启，可点击查看或手动添加释义。'
