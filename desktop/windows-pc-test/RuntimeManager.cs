@@ -82,7 +82,9 @@ public sealed class RuntimeManager
         }
 
         report("正在启动独立 MySQL / Redis / tokenizer…");
-        await RunDockerAsync([.. common, "up", "-d", "--wait", "--wait-timeout", "120", "mysql", "redis", "python"], runtimeRoot, cancellationToken);
+        // Cold MySQL 8.4 initialization can exceed two minutes on this test host.
+        // Keep startup bounded, but allow the first boot and English model health check to finish.
+        await RunDockerAsync([.. common, "up", "-d", "--wait", "--wait-timeout", "360", "mysql", "redis", "python"], runtimeRoot, cancellationToken);
 
         report("正在初始化 PC 测试数据库…");
         await RunDockerAsync([.. common, "run", "--rm", "web", "php", "artisan", "migrate", "--force"], runtimeRoot, cancellationToken);

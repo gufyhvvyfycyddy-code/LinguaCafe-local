@@ -87,7 +87,8 @@ assert.match(runtime, /"image", "inspect", "--format", "\{\{ index \.Config\.Lab
 assert.match(runtime, /result\.ExitCode == 0 && result\.StandardOutput\.Trim\(\) == revision/);
 assert.match(runtime, /PC_TEST_RUNTIME_VERSION/);
 assert.match(runtime, /runtimeImageTag != "dev"/);
-assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "120", "mysql", "redis", "python"/);
+// First-ever MySQL initialization exceeded 120 seconds on the isolated test volume.
+assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "360", "mysql", "redis", "python"/);
 assert.match(runtime, /"migrate", "--force"/);
 assert.match(runtime, /"db:seed", "--force"/);
 assert.match(runtime, /dictionary:import-ecdict/);
