@@ -9,7 +9,7 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 const attributes = read('.gitattributes');
 const dockerfile = read('docker', 'PhpDockerfile');
 const patchBytes = fs.readFileSync(path.join(root, 'docker', 'fsrs-rs-php-php84.patch'));
-const lockfile = read('docker', 'fsrs-rs-php-php84.Cargo.lock');
+const lockfile = read('docker', 'fsrs-rs-php-php84.Cargo.lock').replace(/\r\n/g, '\n');
 
 assert.match(attributes, /\*\.patch text eol=lf/);
 assert.equal(patchBytes.includes(Buffer.from('\r\n')), false, 'FSRS patch must remain LF in Windows checkouts');
