@@ -16,7 +16,7 @@ USER laravel
 
 # pip 25.2 resumes interrupted official downloads; Ubuntu's pip 22 restarts large wheels.
 RUN --mount=type=cache,id=linguacafe-pc-test-pip,target=/home/laravel/.cache/pip,uid=1000,gid=1000 \
-    pip --index-url https://pypi.org/simple --timeout 180 --retries 8 install --user 'pip==25.2'
+    pip --timeout 180 --retries 8 install --index-url https://pypi.org/simple --user 'pip==25.2'
 
 # Preserve downloaded wheels across interrupted PC-test builds (runtime stays unchanged).
 RUN --mount=type=cache,id=linguacafe-pc-test-pip,target=/home/laravel/.cache/pip,uid=1000,gid=1000 \
