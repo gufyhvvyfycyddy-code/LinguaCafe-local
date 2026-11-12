@@ -61,7 +61,16 @@
                     <v-progress-circular indeterminate class="mx-1" size="10" width="2" color="#92B9E2"></v-progress-circular> searching
                 </li>
             </template>
-            
+
+            <li v-if="!userTranslationList.length && !dictionaryTranslationList.length
+                && dictionaryTranslation !== 'loading' && apiTranslations[0] !== 'loading'
+                && (!apiTranslations.length || apiTranslations[0] === 'error')">
+                {{ apiTranslations[0] === 'error'
+                    ? '查询失败，请点击查看详细释义。'
+                    : dictionaryTranslation === 'dictionary-search-disabled'
+                        ? '词典查询未开启，可点击查看或手动添加释义。'
+                        : '本地词典暂未收录此词，点击可查看上下文或手动添加释义。' }}
+            </li>
         </ul>
     </v-card>
 </template>
