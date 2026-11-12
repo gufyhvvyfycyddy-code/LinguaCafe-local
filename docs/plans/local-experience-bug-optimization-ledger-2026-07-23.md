@@ -276,6 +276,11 @@ Python tokenizer 正常运行时会使用项目自定义句子切分器，并识
 
 fallback 必须在 `PARAGRAPH_BREAK`、`NEWLINE` 和 section marker 处结束当前句子，同时避免在 URL 中的句点处错误切句。
 
+#### 2026-11-12 最小候选（等待真实阅读验收）
+- 审查分支 `task/fallback-structure-sentence-boundary-20261112`：仅修改 English fallback 的原有切句正则，在预处理阶段已生成、带空格界限的 `ZZPARAZZ` / `ZZNEWLZZ` / `ZZSECT[A-Z]Z` 两侧断句；仍保留老有标点+空白切句行为，不破坏段落结构 token 和完整 URL。
+- 真实 PHP 运行样本：标题词 `overview` 为 `si=0`、段落正文 `A` 为 `si=2`、换行后 `Next` 为 `si=4`、section 后 `Chapter` 为 `si=7`；带 `ZZPARAZZ` 字样的整条 URL 仍为一个 `si=7` token；旧 `Hello 123! Next.` 仍 `[0,0,0,2,2]`。新增既有 PHPUnit 文件内聚焦回归方法；PHP 语法检查和原生直调已过，**尚未完成真实导入/点击词义/WordSense 来源句 GUI 验收**。
+- 状态仅 `FIXED-WAITING-VERIFY`，不提前关闭 B-006；并核对 Python tokenizer 正常路径不因该候选被改动。
+
 ### [Bug][体验与无障碍][P1] B-007 阅读页 DOM 文本缺少真实空格
 
 #### 现象

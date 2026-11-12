@@ -18,7 +18,9 @@ class EnglishFallbackTokenizerService
         $sentenceIndex = 0;
 
         $sentences = preg_split(
-            '/((?<=[.!?])\s+)/u',
+            // Structure markers are inserted as whitespace-delimited tokens before fallback.
+            // Split around them without matching marker-like text inside a source URL.
+            '/((?<=[.!?])\s+|(?<!\S)(?:ZZPARAZZ|ZZNEWLZZ|ZZSECT[A-Z]Z)(?!\S))/u',
             trim($text),
             -1,
             PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY

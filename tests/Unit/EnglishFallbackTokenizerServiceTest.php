@@ -30,6 +30,27 @@ class EnglishFallbackTokenizerServiceTest extends TestCase
         $this->assertSame('PUNCT', $tokens[1]->pos);
     }
 
+    public function test_fallback_ends_sentences_at_structure_markers_without_breaking_reference_urls(): void
+    {
+        $tokens = $this->service()->tokenize(
+            'Technicity overview ZZPARAZZ A long description without punctuation ZZNEWLZZ Next line. ZZSECTAZ Chapter two https://example.org/ZZPARAZZ/detail matters.',
+            fn (): bool => false,
+            fn (string $word): bool => false,
+        );
+        $indexBySurface = [];
+        foreach ($tokens as $token) {
+            $indexBySurface[$token->w] = $token->si;
+        }
+
+        $this->assertGreaterThan($indexBySurface['overview'], $indexBySurface['A']);
+        $this->assertGreaterThan($indexBySurface['description'], $indexBySurface['Next']);
+        $this->assertGreaterThan($indexBySurface['Next'], $indexBySurface['Chapter']);
+        $this->assertSame($indexBySurface['Chapter'], $indexBySurface['https://example.org/ZZPARAZZ/detail']);
+        $this->assertArrayHasKey('ZZPARAZZ', $indexBySurface);
+        $this->assertArrayHasKey('ZZNEWLZZ', $indexBySurface);
+        $this->assertArrayHasKey('ZZSECTAZ', $indexBySurface);
+    }
+
     public function test_tokenize_preserves_conservative_and_ultra_safe_rules_without_ecdict(): void
     {
         $tokens = $this->service()->tokenize(
