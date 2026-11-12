@@ -46,6 +46,19 @@ services:
     image: linguacafe-pc-test-python:${PC_TEST_RUNTIME_VERSION:-dev}
     restart: unless-stopped
     command: ["python3", "/app/tokenizer.py"]
+    # A started process is not yet a ready English tokenizer. The existing
+    # health endpoint reports model and LemmInflect availability separately
+    # from optional detailed lemma-quality diagnostics.
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import json,urllib.request; info=json.load(urllib.request.urlopen('http://127.0.0.1:8678/tokenizer/health',timeout=15)); assert info.get('english',{}).get('model_loaded') and info.get('english',{}).get('lemminflect_available')"
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 20s
     networks:
       - pc-test
 
@@ -63,7 +76,7 @@ services:
       redis:
         condition: service_started
       python:
-        condition: service_started
+        condition: service_healthy
     environment:
       APP_ENV: local
       APP_DEBUG: "false"

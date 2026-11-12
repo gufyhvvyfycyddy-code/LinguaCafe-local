@@ -157,6 +157,11 @@ LinguaCafe 中的 Jellyfin 功能只用于一种可选导入方式：从 Jellyfi
 - 阅读页词元归并正确；
 - 不使用旧文章数据冒充修复成功。
 
+#### 2026-11-12 新 PC Test 启动就绪门禁候选（未完成真实导入）
+- 在隔离分支 `task/b001-python-readiness-gate-20261112` 的独立 `linguacafe-pc-test-next` Compose 中，原 `web.depends_on.python=service_started` 只保证分词进程已启动，不证明 Bottle HTTP、英文模型与 LemmInflect 可用；这是现役源码启动竞态风险，不能冒称真实用户复现。
+- 最小候选给 Python 服务增加对**既有** `/tokenizer/health` 的英语模型/词形包存在性检测（不要求所有哲学例词质量测试全部通过），改 Web 等待 `service_healthy`；仅改 PC Test Compose、原 Windows 构建守卫与本台账，不碰旧本机8678脚本、词元/FSRS/数据，也不引入新 API。
+- 状态 **FIXED-WAITING-VERIFY**：Compose解析与原Guard通过只算契约层；待同SHA Python/Web镜像启动，独立验收英语 tokenizer 实际健康、哲学词形输入、导入不再 fallback 及 Browser UI，才能关闭 B-001；`/models/list` 的原字典不包含 English，不允许靠它判定英文可用。
+
 ### [Bug][后端问题][P1] B-002 首次登录统计初始化竞态
 
 #### 现象

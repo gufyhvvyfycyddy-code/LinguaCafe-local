@@ -27,6 +27,12 @@ assert.match(compose, /name: linguacafe-pc-test-next/);
 assert.match(compose, /linguacafe-pc-test-web:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(compose, /linguacafe-pc-test-python:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(compose, /MYSQL_DATABASE: linguacafe_pc_test/);
+// PC import must not start while the tokenizer process is running but its
+// English model is missing or the HTTP service is not ready.
+assert.match(compose, /python:\s*\n\s*condition: service_healthy/);
+assert.match(compose, /http:\/\/127\.0\.0\.1:8678\/tokenizer\/health/);
+assert.match(compose, /info\.get\('english',\{\}\)\.get\('model_loaded'\)/);
+assert.match(compose, /info\.get\('english',\{\}\)\.get\('lemminflect_available'\)/);
 assert.match(compose, /127\.0\.0\.1:9391:80/);
 assert.match(compose, /127\.0\.0\.1:6001:6001/);
 assert.match(compose, /mysql-data:\/var\/lib\/mysql/);
