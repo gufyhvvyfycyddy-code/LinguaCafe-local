@@ -68,8 +68,14 @@ try {
     finally { Pop-Location }
 
     foreach ($image in @("linguacafe-pc-test-web:$commit", "linguacafe-pc-test-python:$commit")) {
-        $revision = (docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' $image)
-        if ($LASTEXITCODE -ne 0 -or $revision.Trim() -ne $commit) {
+        # Windows PowerShell strips the nested quotes in Docker's Go template.
+        # Fetch JSON labels instead, then select the exact revision in PowerShell.
+        $labelsJson = docker image inspect --format '{{json .Config.Labels}}' $image
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not inspect Docker image labels."
+        }
+        $revision = ($labelsJson | ConvertFrom-Json).'org.opencontainers.image.revision'
+        if ($revision -ne $commit) {
             throw "Docker image source revision does not match archived commit."
         }
     }

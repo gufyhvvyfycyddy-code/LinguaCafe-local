@@ -75,6 +75,10 @@ assert.match(installer, /unsafeCount -ne 0/);
 assert.match(installer, /ExtractToDirectory\(\$runtimeZip, \$sourceDir\)/);
 assert.match(installer, /-f \$composeFile build web python/);
 assert.match(installer, /org\.opencontainers\.image\.revision/);
+// Native PowerShell must not pass nested double-quoted Go-template keys to Docker.
+assert.match(installer, /--format '\{\{json \.Config\.Labels\}\}'/);
+assert.match(installer, /\$labelsJson \| ConvertFrom-Json/);
+assert.doesNotMatch(installer, /docker image inspect --format '\{\{ index \.Config\.Labels/);
 assert.match(installer, /COMPOSE_DISABLE_ENV_FILE/);
 assert.match(installer, /Push-Location \$sourceDir/);
 assert.match(installer, /LinguaCafePCTestNext/);
