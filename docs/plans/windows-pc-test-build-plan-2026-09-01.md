@@ -20,6 +20,20 @@ The installed 2026-09 PC Test is historical evidence, **not the supported prereq
 
 Authorized by the user's explicit 2026-11-12 04:53 request. The single authority for task status and runtime permissions remains `D:\AI-Tools\STUDY_WORKFLOW_MASTER_TEST_AND_HANDOFF.md` and `docs/execution/CURRENT_MILESTONE.json`. No Git force push, publication of old secret-bearing archives, editing unrelated personal databases, or overwriting dirty original worktrees.
 
+## 2026-11-13 实际 Windows 环境恢复经验（RUN203：安装与交互桌面分开验证）
+
+**适用当前新版 PC Test 和后续 B04/I05/G07，权威任务状态仍只看唯一 MASTER。** 这不是新的平行计划，现场证据记录在 MASTER RUN203。已实测的源码提交为 b5aff4a9 -> 修复后 760028d09fe23cd26eed68bf8368f92c9f9096a3；该提交在受审任务分支，不代表 master 已升级。
+
+1. **DevSpace 的安装器拒绝不是 Windows UAC**。历史提示为 “nested instruction discovery ... paths cannot be resolved statically”。先通过 DevSpace 正式 open_workspace 打开确切安装脚本所属的干净源码 worktree，遵守返回的 AGENTS；直接使用同一 DevSpace start_job 中可静态识别的 PowerShell 字面绝对路径运行安装脚本，例如 & 'C:\Users\Administrator\.devspace\worktrees\LinguaCafe-main-b5877502\scripts\windows\install-pc-test.ps1'。避免再包一层 powershell.exe -Command/-File 让平台无法解析内层目标。**这是平台本身明确推荐的合法归属修复，不是关闭安全规则或换工具规避拒绝**。如果直接形式再次明确被拒，只停本动作，继续其余合法独立任务。
+2. **安装器真实 Docker revision 兼容故障已经修复**。原生 PowerShell 会丢失 Docker Go-template 的复杂嵌套引号，产生 “function org not defined”。新代码先以 Docker --format '{{json .Config.Labels}}' 获取 JSON，再在 PowerShell ConvertFrom-Json 后取 org.opencontainers.image.revision。该修复已提交 760028d0，原 WindowsPcTestBuildGuard 真正 PASS，Web/Python 镜像 SHA 在本机实测一致；安装器第二次真正执行 exit0，将 EXE、runtime-source.zip 和 SHA marker 发布至 LocalAppData\LinguaCafePCTestNext\app-760028d09fe2，原桌面快捷方式备份仍保留，旧 App 目录未提前删除。
+3. **后台 DevSpace 进程 Session 0 不是交互桌面**。直接通过 DevSpace 后台启动 WPF 曾得到 0x80070578 “无效的窗口句柄”：真实 Get-Process 显示 LinguaCafe PID15228 属 Session0、Explorer 属 Session1。不得为了测试通过而关闭 WebView2、降低 Windows 权限或把 HTTP200 冒充 GUI。应优先由已登录用户在真实 Windows 桌面双击现有 “LinguaCafe PC Test” 快捷方式；若要让自动化启动 GUI，可采用 Windows Task Scheduler 正规 **InteractiveToken + Limited** 一次性 on-demand 任务，且必须先查 desktop Explorer 的真实用户和 SessionId、确认唯一任务名称不存在，action 固定指向已安装版本的 EXE，**不存密码、不提权、不创建通知/重复任务**。任务运行后验证 WPF 进程为与 Explorer 一致的 Session1 且 startup.log 到 “PC 测试版已就绪：/”，只卸载/注销本次精确命名的临时调度任务，保留用户正在运行的应用。确切用户/任务名/安装路径每轮重新读取，不把本轮机器账号写成通用常量。未经用户或当前任务授权不得更改其它计划任务、Windows 服务/ACL 或账户；如果 InteractiveToken 无效，就交给用户手工双击快捷方式。
+4. **上述交互式正式方法已有本机端到端例证**：临时 Task Scheduler 名称 LinguaCafe-PCTest-Interactive-Run203，以当前 Explorer 的同一 Windows 用户、LogonType=Interactive、RunLevel=Limited 启动安装 EXE，WPF PID48540 实际属于 Session1；桌面启动日志顺序证实 Docker、数据库/词典检查、WebView2 初始化、正常 /setup 创建专用测试管理员、自动登录，最后写 “PC 测试版已就绪：/”。本轮 exact task 已 Unregister、再次确证不存在，运行的 Session1 WPF 进程仍在。旧的 Session0 失败进程仅按精确 PID 终止，未杀别的 Node/浏览器/用户进程；原用户应用/数据未动。
+5. **独立数据库与 UI 边界**：新 v2 MySQL 库 linguacafe_pc_test 的 server_uuid=2d0ba5fa-df3c-11f1-b5e7-22d27065f6c3 已在 RUN202/RUN203 验证；真实导入 ECDICT=768739、--status HEALTHY（本轮两次独立核实）。WPF 首启后来自**当前 v2 Web 容器**的只读回查 users=1、review_cards=0、review_logs=0。旧 RUN197 验收 Web 独占 9394/6004 的容器经 owner 复核后已定点停止，v2 Web 现在实际绑定 127.0.0.1:9394/6004，旧 RUN194 9391/6001 继续保留；不要停止/清理其它同名旧容器卷。
+6. **浏览器验收不再只等坏掉的 Chrome MCP**：官方 Chrome DevTools MCP 返回连接失败时，当前 AGENTS/ADR-0033 允许使用现役 playwright-local Skill 的隔离 Chrome。已经真实导航 v2 的 /login，页面有“邮箱”、“密码”、“登录”按钮（独立浏览器没有自动登录 cookie，这是正常会话隔离），但该页面当轮 Console 仍有 2 项 error，尚未逐条归因，需下轮复验。此前旧 RUN197 页面通过不能冒充新 v2；不能拿 API200 当浏览器成功。**当前正式复习卡=0，尚未真实完成 Reader 导入、查词、Sense FSRS**，必须在绑定独立 testing DB 的真实 GUI 条件满足后再做页面写入、录入测试卡及评分。
+
+**阶段性验收边界**：RUN203 可确认“平台脚本调用恢复 + ECDICT v2 HEALTHY + 单次版本化安装成功 + 原生 Session1 WPF/自动登录成功”；仍没有两次连续升级与失败回退实物、完整 Reader → Sense FSRS 真 GUI、SP/CalDAV 05:00、复习记录安全回读等证据，所以 B04/I05/G07 和总工作流继续 INCOMPLETE，不得自动勾选。下一轮优先从当前真实 Session1 运行实例的 Reader/词义/FSRS 开始，完成必要 server-bound 测试数据库身份，并修掉/分类 Chrome Console error；不要再次反复构建词典或重新研究权限阻断。
+
+
 ## Current checkpoint — 2026-09-02
 
 - Production Docker build blocker closed: Windows patch line endings are fixed and the PHP 8.4 FSRS dependency graph is now pinned by repository `Cargo.lock` + `cargo build --locked`.
