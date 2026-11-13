@@ -36,7 +36,7 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 murmurhash==1.0.15
 newspaper3k==0.2.8
-nltk==3.10.3
+nltk==3.10.4
 numpy==2.2.6
 packaging==26.3
 pillow==12.3.0
