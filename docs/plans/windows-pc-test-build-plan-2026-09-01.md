@@ -71,8 +71,11 @@ The shell does not own study data, FSRS, Reader, dictionary search, backups, use
 - current tokenizer image;
 - current production Web image;
 - persistent app storage volume;
-- loopback Web port `9391`;
-- loopback Reverb port `6001`.
+- isolated Compose project `linguacafe-pc-test-study-v2` (does not attach old `linguacafe-pc-test-next` volumes);
+- loopback Web port `9394` (old test `9391` remains untouched);
+- loopback browser Reverb port `6004` mapped to container `6001` (old `6001` remains untouched); the rendered `lc-ws-port` metadata configures the actual browser websocket endpoint, while other runtime layouts default to `6001`.
+
+The launch path rechecks ECDICT health after a scoped re-import and stops with an error if its CSV is missing or the dictionary remains unhealthy; an incomplete import cannot silently pass as a successful start.
 
 The runtime uses test-only database/reverb credentials and never reuses repository `.env` values.
 

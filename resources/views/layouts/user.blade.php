@@ -14,6 +14,7 @@
 
     <!-- CSRF Token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="lc-ws-port" content="{{ config('reverb.browser_port', 6001) }}">
 
     <title>LinguaCafe</title>
 

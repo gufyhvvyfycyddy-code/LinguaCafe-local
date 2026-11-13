@@ -27,7 +27,7 @@ function createEcho() {
             cluster: 'mt1',
             forceTLS: false,
             wsHost: window.location.hostname,
-            wsPort: 6001,
+            wsPort: Number(document.querySelector('meta[name="lc-ws-port"]')?.content) || 6001,
             enabledTransports: ['ws', 'wss'],
         });
 

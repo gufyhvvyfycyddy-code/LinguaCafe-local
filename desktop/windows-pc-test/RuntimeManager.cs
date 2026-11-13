@@ -9,7 +9,7 @@ namespace LinguaCafe.PcTest;
 
 public sealed class RuntimeManager
 {
-    public const string BaseUrl = "http://127.0.0.1:9391";
+    public const string BaseUrl = "http://127.0.0.1:9394";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private string runtimeImageTag = "dev";
@@ -57,7 +57,7 @@ public sealed class RuntimeManager
 
         var common = new[]
         {
-            "compose", "-p", "linguacafe-pc-test-next", "-f", composeFile,
+            "compose", "-p", "linguacafe-pc-test-study-v2", "-f", composeFile,
         };
 
         var webImage = $"linguacafe-pc-test-web:{runtimeImageTag}";
@@ -97,14 +97,21 @@ public sealed class RuntimeManager
         if (dictionaryStatus.ExitCode != 0)
         {
             var ecdict = ResolveEcdictCsv();
-            if (ecdict is not null)
+            if (ecdict is null)
             {
-                report("首次运行正在导入 ECDICT 英汉词典…");
-                await RunDockerAsync(
-                    [.. common, "run", "--rm", "web", "php", "artisan", "dictionary:import-ecdict", "--csv=/pc-test/ecdict.csv", "--batch=5000"],
-                    runtimeRoot,
-                    cancellationToken);
+                throw new FileNotFoundException("ECDICT dictionary is unhealthy and the local CSV source is missing.");
             }
+
+            report("正在恢复并核验 ECDICT 英汉词典…");
+            await RunDockerAsync(
+                [.. common, "run", "--rm", "web", "php", "artisan", "dictionary:import-ecdict", "--csv=/pc-test/ecdict.csv", "--batch=2000", "--force"],
+                runtimeRoot,
+                cancellationToken);
+            // A partial dictionary must not turn a failed re-import into a successful launch.
+            await RunDockerAsync(
+                [.. common, "run", "--rm", "web", "php", "artisan", "dictionary:import-ecdict", "--status"],
+                runtimeRoot,
+                cancellationToken);
         }
 
         report("正在启动 LinguaCafe PC 测试服务…");
@@ -230,6 +237,7 @@ public sealed class RuntimeManager
         var env = new Dictionary<string, string?>
         {
             ["PC_TEST_RUNTIME_VERSION"] = runtimeImageTag,
+            ["COMPOSE_DISABLE_ENV_FILE"] = "1",
         };
         var ecdict = ResolveEcdictCsv();
         if (ecdict is not null)

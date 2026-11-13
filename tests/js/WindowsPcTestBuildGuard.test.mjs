@@ -23,7 +23,7 @@ const gitignore = read('.gitignore');
 assert.match(project, /<TargetFramework>net8\.0-windows<\/TargetFramework>/);
 assert.match(project, /<PackageReference Include="Microsoft\.Web\.WebView2" Version="1\.0\.4191\.47"/);
 
-assert.match(compose, /name: linguacafe-pc-test-next/);
+assert.match(compose, /name: linguacafe-pc-test-study-v2/);
 assert.match(compose, /linguacafe-pc-test-web:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(compose, /linguacafe-pc-test-python:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(compose, /MYSQL_DATABASE: linguacafe_pc_test/);
@@ -33,11 +33,20 @@ assert.match(compose, /python:\s*\n\s*condition: service_healthy/);
 assert.match(compose, /http:\/\/127\.0\.0\.1:8678\/tokenizer\/health/);
 assert.match(compose, /info\.get\('english',\{\}\)\.get\('model_loaded'\)/);
 assert.match(compose, /info\.get\('english',\{\}\)\.get\('lemminflect_available'\)/);
-assert.match(compose, /127\.0\.0\.1:9391:80/);
-assert.match(compose, /127\.0\.0\.1:6001:6001/);
+assert.match(compose, /127\.0\.0\.1:9394:80/);
+assert.match(compose, /127\.0\.0\.1:6004:6001/);
+assert.match(compose, /REVERB_BROWSER_PORT: "6004"/);
+const reverbConfig = read('config', 'reverb.php');
+const echoClient = read('resources', 'js', 'vuex', 'Shared.js');
+for (const layout of ['app.blade.php', 'user.blade.php']) {
+  assert.match(read('resources', 'views', 'layouts', layout), /meta name="lc-ws-port" content="\{\{ config\('reverb\.browser_port', 6001\) \}\}"/);
+}
+assert.match(reverbConfig, /'browser_port' => \(int\) env\('REVERB_BROWSER_PORT', 6001\)/);
+assert.match(echoClient, /wsPort: Number\(document\.querySelector\('meta\[name="lc-ws-port"\]'\)\?\.content\) \|\| 6001/);
+assert.doesNotMatch(echoClient, /wsPort:\s*6001\s*,/);
 assert.match(compose, /mysql-data:\/var\/lib\/mysql/);
 assert.match(compose, /PC_TEST_SOURCE_COMMIT: \$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
-assert.match(runtime, /linguacafe-pc-test-next/);
+assert.match(runtime, /linguacafe-pc-test-study-v2/);
 assert.match(runtime, /LinguaCafePCTestNext/);
 assert.equal((windowCode.match(/LinguaCafePCTestNext/g) ?? []).length, 2);
 assert.doesNotMatch(windowCode, /"LinguaCafePCTest"/);
@@ -88,12 +97,17 @@ assert.match(runtime, /result\.ExitCode == 0 && result\.StandardOutput\.Trim\(\)
 assert.match(runtime, /PC_TEST_RUNTIME_VERSION/);
 assert.match(runtime, /runtimeImageTag != "dev"/);
 assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "600", "mysql", "redis", "python"/);
+assert.match(runtime, /BaseUrl = "http:\/\/127\.0\.0\.1:9394"/);
+assert.match(runtime, /"COMPOSE_DISABLE_ENV_FILE"\] = "1"/);
 // A clean MySQL 8.4 volume took ~300s to initialize in real Windows Docker Desktop.
 // Both the Compose health grace and the WPF wait must allow that cold startup.
 assert.match(compose, /start_period: 480s/);
 assert.match(runtime, /"migrate", "--force"/);
 assert.match(runtime, /"db:seed", "--force"/);
 assert.match(runtime, /dictionary:import-ecdict/);
+assert.match(runtime, /"--batch=2000", "--force"/);
+assert.match(runtime, /ECDICT dictionary is unhealthy and the local CSV source is missing/);
+assert.equal((runtime.match(/"dictionary:import-ecdict", "--status"/g) ?? []).length, 2);
 assert.match(runtime, /PC_TEST_ECDICT_CSV/);
 assert.doesNotMatch(runtime, /migrate:fresh|migrate:refresh|migrate:reset|db:wipe/);
 
@@ -115,6 +129,7 @@ assert.match(installer, /staging-/);
 assert.match(installer, /dotnet publish[\s\S]*-o \$stageDir/);
 assert.match(installer, /git archive --format=zip --output=\$runtimeZip HEAD/);
 assert.match(installer, /\$env:PC_TEST_RUNTIME_VERSION = \$commit/);
+assert.match(installer, /docker compose -p linguacafe-pc-test-study-v2/);
 assert.match(installer, /docker compose[\s\S]*build web python/);
 assert.match(installer, /Move-Item -LiteralPath \$stageDir -Destination \$releaseDir/);
 assert.match(installer, /runtime-version\.txt/);

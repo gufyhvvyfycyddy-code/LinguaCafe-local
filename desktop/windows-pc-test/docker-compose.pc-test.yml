@@ -1,4 +1,4 @@
-name: linguacafe-pc-test-next
+name: linguacafe-pc-test-study-v2
 
 networks:
   pc-test:
@@ -83,7 +83,7 @@ services:
       APP_ENV: local
       APP_DEBUG: "false"
       APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-      APP_URL: http://127.0.0.1:9391
+      APP_URL: http://127.0.0.1:9394
       ALLOW_WEB_REGISTER: "false"
       DB_CONNECTION: mysql
       DB_HOST: mysql
@@ -110,14 +110,15 @@ services:
       REVERB_HOST: 127.0.0.1
       REVERB_PORT: "6001"
       REVERB_SCHEME: http
+      REVERB_BROWSER_PORT: "6004"
       BACKUP_RESTORE_VALIDATION_HOST: mysql
       BACKUP_RESTORE_VALIDATION_PORT: "3306"
       BACKUP_RESTORE_VALIDATION_USERNAME: root
       BACKUP_RESTORE_VALIDATION_PASSWORD: pc-test-root-only
       LOG_CHANNEL: stderr
     ports:
-      - "127.0.0.1:9391:80"
-      - "127.0.0.1:6001:6001"
+      - "127.0.0.1:9394:80"
+      - "127.0.0.1:6004:6001"
     volumes:
       - storage-data:/var/www/html/storage
       - "${PC_TEST_ECDICT_CSV:-./empty-ecdict.csv}:/pc-test/ecdict.csv:ro"

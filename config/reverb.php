@@ -15,6 +15,9 @@ return [
 
     'default' => env('REVERB_SERVER', 'reverb'),
 
+    // Public browser WebSocket port may differ from the internal Reverb port.
+    'browser_port' => (int) env('REVERB_BROWSER_PORT', 6001),
+
     /*
     |--------------------------------------------------------------------------
     | Reverb Servers

@@ -62,7 +62,7 @@ try {
     $composeFile = Join-Path $sourceDir "desktop\windows-pc-test\docker-compose.pc-test.yml"
     Push-Location $sourceDir
     try {
-        docker compose -p linguacafe-pc-test-next -f $composeFile build web python
+        docker compose -p linguacafe-pc-test-study-v2 -f $composeFile build web python
         if ($LASTEXITCODE -ne 0) { throw "Docker Web/Python build failed." }
     }
     finally { Pop-Location }

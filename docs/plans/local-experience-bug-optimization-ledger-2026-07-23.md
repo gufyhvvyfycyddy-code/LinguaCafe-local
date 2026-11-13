@@ -436,6 +436,20 @@ fallback 必须在 `PARAGRAPH_BREAK`、`NEWLINE` 和 section marker 处结束当
 
 2026-11-13 RUN197：先证明`linguacafe-study-run197`项目和卷均不存在，再按**修改后的同一Compose文件**创建新项目/新MySQL卷并实际执行`up -d --wait --wait-timeout 600 mysql redis python`；服务最终均healthy且命令实际`exit0`，MySQL完成首次初始化（约4分钟），JS Guard通过，git diff --check通过。**状态 FIXED-WAITING-VERIFY（不是CLOSED）**：尚未由发布后的正常Windows WPF/WebView2外壳直接启动、完成登录与真实阅读/FSRS GUI；且尚未在WPF版本化安装/失败回滚中验收。下次以实际安装包首次启动与用户重测结果作为关闭依据。
 
+### [Bug][PC Test][P1] B-014 不同测试实例复用旧数据卷与浏览器实时连接串端口
+
+#### 已确认的现场冲突
+
+2026-11-13 RUN198–RUN201：真正运行的`linguacafe-study-run194-web-1`占用`127.0.0.1:9391`和`127.0.0.1:6001`；旧Compose项目`linguacafe-pc-test-next`存在此前创建、未释放的`mysql-data`和`redis-data`持久卷。审查版旧WPF`RuntimeManager.BaseUrl=9391`与`-p linguacafe-pc-test-next`、Compose相同项目名以及Web端口，若直接启动将重用旧卷或发生端口冲突。单改Web端口也不足：旧`resources/js/vuex/Shared.js`固定浏览器WebSocket端口6001，可能把新版页面实时事件请求交给旧实例。**已确认的是运行环境碰撞与源代码连通风险，不是已复现用户数据串写。**
+
+#### 最小受控修复候选
+
+新版本专用Compose项目`linguacafe-pc-test-study-v2`（核查无同名旧容器或卷）；WPF、Compose与安装器共用其名。宿主Web独占`127.0.0.1:9394`，WebSocket独占`127.0.0.1:6004`（容器内部仍6001）；服务器以`REVERB_BROWSER_PORT`输出安全的`lc-ws-port` meta，通用JS从此meta取浏览器端口，未配置时兼容旧6001。这避免为了一个PC版硬编码进Vue公共业务分支。WPF同时要求ECDICT异常状态先由**此独占测试库**基于本地只读CSV受控重导，再次`--status`成功才启动；缺CSV立即报错，不隐瞒半截词典。
+
+#### 当前验证与关闭条件
+
+源码改动只覆盖现役独占PC入口与最小浏览器连接配置，以及原`WindowsPcTestBuildGuard`和本台账；`git diff --check`、JS guard、`dotnet build`及Docker Compose配置解析通过。尚需来自**同一最终SHA构建**的Web镜像实测9394／6004无串线、正常WPF.exe首次安装/登录/阅读和版本升级可回滚、两个旧实例完全不变的实证，才能标CLOSED。此前只读Luna审查支持端口和项目隔离，但不能替代真实Docker/GUI结果。当前状态：**FIXED-WAITING-VERIFY**，I05/B04维持未DONE。
+
 ---
 
 ## 五、待优化台账
