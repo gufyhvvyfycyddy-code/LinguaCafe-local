@@ -87,7 +87,10 @@ assert.match(runtime, /"image", "inspect", "--format", "\{\{ index \.Config\.Lab
 assert.match(runtime, /result\.ExitCode == 0 && result\.StandardOutput\.Trim\(\) == revision/);
 assert.match(runtime, /PC_TEST_RUNTIME_VERSION/);
 assert.match(runtime, /runtimeImageTag != "dev"/);
-assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "120", "mysql", "redis", "python"/);
+assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "600", "mysql", "redis", "python"/);
+// A clean MySQL 8.4 volume took ~300s to initialize in real Windows Docker Desktop.
+// Both the Compose health grace and the WPF wait must allow that cold startup.
+assert.match(compose, /start_period: 480s/);
 assert.match(runtime, /"migrate", "--force"/);
 assert.match(runtime, /"db:seed", "--force"/);
 assert.match(runtime, /dictionary:import-ecdict/);

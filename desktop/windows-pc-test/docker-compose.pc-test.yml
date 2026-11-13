@@ -23,7 +23,9 @@ services:
       interval: 2s
       timeout: 2s
       retries: 60
-      start_period: 10s
+      # An empty MySQL 8.4 volume can need about five minutes on Windows Docker Desktop.
+      # Keep first initialization inside the health grace window.
+      start_period: 480s
     volumes:
       - mysql-data:/var/lib/mysql
     networks:

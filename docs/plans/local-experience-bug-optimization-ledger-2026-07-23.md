@@ -422,6 +422,20 @@ fallback 必须在 `PARAGRAPH_BREAK`、`NEWLINE` 和 section marker 处结束当
 
 只有详细子台账中 RX-001 至 RX-013 全部满足各自退出验收，且正常、失败、超时重试、窗口重建、会话 recovery、Unicode 文本和重复调用矩阵通过后，B-012 才能关闭。
 
+### [Bug][PC Test][P1] B-013 全新 MySQL 数据卷首次启动被过早判定失败
+
+#### 复现与用户影响
+
+2026-11-13 RUN195，使用当前审查源`aedc68e113285598fcf7fe20d780ffcabe3c8bba`、**新建且专属**的`linguacafe-study-run195_mysql-data`，原PC启动配置`RuntimeManager.cs:85`执行`docker compose up -d --wait --wait-timeout 120 mysql redis python`，真实退出码1，报告`application not healthy after 2m0s`。但同一Docker日志显示MySQL 8.4.11首次建库05:15:01Z开始、05:19:59Z才正式ready，随后状态healthy；冷启动约298秒。PC Test会在其实仍在正常建库时提前提示失败，用户无法继续首次安装。
+
+#### 范围与最小修复
+
+仅`desktop/windows-pc-test/RuntimeManager.cs`等待时长与`desktop/windows-pc-test/docker-compose.pc-test.yml`中MySQL健康检查宽限期；保留独立卷、Web/Python同源码SHA、原有数据及自动重用。现役首次冷启动实测约298秒，不能只把120改180。独立修复候选把Compose MySQL `start_period`增至480秒、Windows等待增至600秒，`tests/js/WindowsPcTestBuildGuard.test.mjs`用相应最小守卫。未改变业务接口/DB结构/FSRS。
+
+#### 独立验收与关闭线
+
+2026-11-13 RUN197：先证明`linguacafe-study-run197`项目和卷均不存在，再按**修改后的同一Compose文件**创建新项目/新MySQL卷并实际执行`up -d --wait --wait-timeout 600 mysql redis python`；服务最终均healthy且命令实际`exit0`，MySQL完成首次初始化（约4分钟），JS Guard通过，git diff --check通过。**状态 FIXED-WAITING-VERIFY（不是CLOSED）**：尚未由发布后的正常Windows WPF/WebView2外壳直接启动、完成登录与真实阅读/FSRS GUI；且尚未在WPF版本化安装/失败回滚中验收。下次以实际安装包首次启动与用户重测结果作为关闭依据。
+
 ---
 
 ## 五、待优化台账
