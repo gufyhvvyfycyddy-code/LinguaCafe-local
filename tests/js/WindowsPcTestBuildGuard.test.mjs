@@ -47,6 +47,10 @@ for (const file of ['.envrc', '.env_backup', '.env-prod', 'nested/.envrc']) {
 for (const file of ['docker/PhpDockerfile', 'docker/PythonDockerfile']) {
   assert.match(read(file), /LABEL org\.opencontainers\.image\.revision=\$PC_TEST_SOURCE_COMMIT/);
 }
+const phpDockerfile = read('docker/PhpDockerfile');
+assert.match(phpDockerfile, /CARGO_NET_GIT_FETCH_WITH_CLI=true cargo build --release --locked/);
+assert.match(phpDockerfile, /--mount=type=cache,id=linguacafe-pc-test-cargo-git/);
+assert.match(phpDockerfile, /cp target\/release\/libfsrs_rs_php\.so libfsrs_rs_php\.so/);
 assert.match(compose, /PC_TEST_SOURCE_COMMIT: \$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(gitignore, /^\/desktop\/windows-pc-test\/bin\/$/m);
 assert.match(gitignore, /^\/desktop\/windows-pc-test\/obj\/$/m);
