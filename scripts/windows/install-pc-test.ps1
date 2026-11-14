@@ -18,7 +18,7 @@ try {
     }
 
     # Separate test lane: old installation and its Docker volumes are never touched.
-    $installRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "LinguaCafePCTest"
+    $installRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "LinguaCafePCTestStudyV4"
     New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
     $releaseDir = Join-Path $installRoot ("app-" + $commit.Substring(0, 12))
     if (Test-Path -LiteralPath $releaseDir) {
@@ -63,7 +63,7 @@ try {
     $composeFile = Join-Path $sourceDir "desktop\windows-pc-test\docker-compose.pc-test.yml"
     Push-Location $sourceDir
     try {
-        docker compose -p linguacafe-pc-test -f $composeFile build web python
+        docker compose -p linguacafe-pc-test-study-v4 -f $composeFile build web python
         if ($LASTEXITCODE -ne 0) { throw "Docker Web/Python build failed." }
     }
     finally { Pop-Location }
@@ -83,7 +83,7 @@ try {
 
     Set-Content -LiteralPath (Join-Path $stageDir "runtime-version.txt") -Value $commit -Encoding ascii -NoNewline
     $desktop = [Environment]::GetFolderPath("Desktop")
-    $shortcutPath = Join-Path $desktop "LinguaCafe PC Test.lnk"
+    $shortcutPath = Join-Path $desktop "LinguaCafe PC Test Study V4.lnk"
     $tempShortcut = Join-Path $desktop ("LinguaCafe PC Test." + $nonce + ".lnk")
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($tempShortcut)

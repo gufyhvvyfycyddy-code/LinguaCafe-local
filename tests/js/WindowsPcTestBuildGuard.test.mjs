@@ -23,12 +23,12 @@ const gitignore = read('.gitignore');
 assert.match(project, /<TargetFramework>net8\.0-windows<\/TargetFramework>/);
 assert.match(project, /<PackageReference Include="Microsoft\.Web\.WebView2" Version="1\.0\.4191\.47"/);
 
-assert.match(compose, /name: linguacafe-pc-test/);
+assert.match(compose, /name: linguacafe-pc-test-study-v4/);
 assert.match(compose, /linguacafe-pc-test-web:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(compose, /linguacafe-pc-test-python:\$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
-assert.match(compose, /MYSQL_DATABASE: linguacafe_pc_test/);
-assert.match(compose, /127\.0\.0\.1:9391:80/);
-assert.match(compose, /127\.0\.0\.1:6001:6001/);
+assert.match(compose, /MYSQL_DATABASE: linguacafe_pc_test_study_v4/);
+assert.match(compose, /127\.0\.0\.1:9396:80/);
+assert.match(compose, /127\.0\.0\.1:6006:6001/);
 assert.match(compose, /mysql-data:\/var\/lib\/mysql/);
 assert.match(compose, /storage-data:\/var\/www\/html\/storage/);
 assert.match(compose, /\$\{PC_TEST_ECDICT_CSV:-\.\/empty-ecdict\.csv\}:\/pc-test\/ecdict\.csv:ro/);
@@ -57,6 +57,9 @@ assert.match(gitignore, /^\/desktop\/windows-pc-test\/obj\/$/m);
 assert.doesNotMatch(compose, /env_file:|\.env/);
 
 assert.match(runtime, /APPDATA|LocalApplicationData/);
+assert.match(runtime, /LinguaCafePCTestStudyV4/);
+assert.match(runtime, /127\.0\.0\.1:9396/);
+assert.match(runtime, /linguacafe-pc-test-study-v4/);
 assert.match(runtime, /runtime-version\.txt/);
 assert.match(runtime, /DockerImageMatchesRevisionAsync/);
 assert.match(runtime, /org.opencontainers.image.revision/);
@@ -99,7 +102,9 @@ assert.match(installer, /ExtractToDirectory\(\$runtimeZip, \$sourceDir\)/);
 assert.match(installer, /org\.opencontainers\.image\.revision/);
 assert.match(installer, /COMPOSE_DISABLE_ENV_FILE/);
 assert.match(installer, /runtime-version\.txt/);
-assert.match(installer, /LinguaCafe PC Test\.lnk/);
+assert.match(installer, /LinguaCafe PC Test Study V4\.lnk/);
+assert.match(installer, /LinguaCafePCTestStudyV4/);
+assert.match(installer, /docker compose -p linguacafe-pc-test-study-v4/);
 assert.match(installer, /LinguaCafe PC Test\.exe/);
 
 // Run the actual release/shortcut switch in temporary paths. A failed shortcut

@@ -9,13 +9,13 @@ namespace LinguaCafe.PcTest;
 
 public sealed class RuntimeManager
 {
-    public const string BaseUrl = "http://127.0.0.1:9391";
+    public const string BaseUrl = "http://127.0.0.1:9396";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private string runtimeImageTag = "dev";
     private readonly string appDataRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LinguaCafePCTest");
+        "LinguaCafePCTestStudyV4");
 
     public string StatePath => Path.Combine(appDataRoot, "state.json");
 
@@ -57,7 +57,7 @@ public sealed class RuntimeManager
 
         var common = new[]
         {
-            "compose", "-p", "linguacafe-pc-test", "-f", composeFile,
+            "compose", "-p", "linguacafe-pc-test-study-v4", "-f", composeFile,
         };
 
         var webImage = $"linguacafe-pc-test-web:{runtimeImageTag}";
