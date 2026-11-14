@@ -106,5 +106,9 @@ USER laravel
 
 RUN composer install --optimize-autoloader --no-dev
 
+# Label the exact committed ZIP source, checked before Windows installation.
+ARG PC_TEST_SOURCE_COMMIT=dev
+LABEL org.opencontainers.image.revision=$PC_TEST_SOURCE_COMMIT
+
 ENTRYPOINT ["/var/www/html/entrypoint.sh"]
 CMD ["supervisord", "--configuration=/var/www/html/config/supervisord.conf", "--nodaemon"]

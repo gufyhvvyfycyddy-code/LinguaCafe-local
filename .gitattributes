@@ -5,10 +5,75 @@
 CHANGELOG.md export-ignore
 
 # Keep local configuration and credential snapshots out of source archives.
-.env -diff export-ignore
-.env.* -diff export-ignore
-.env.example -export-ignore
-.env.*.example -export-ignore
+.env* -diff export-ignore
+**/.env* -diff export-ignore
+*.pem -diff export-ignore
+**/*.pem -diff export-ignore
+*.key -diff export-ignore
+**/*.key -diff export-ignore
+*secret* -diff export-ignore
+**/*secret* -diff export-ignore
+credentials* -diff export-ignore
+**/credentials* -diff export-ignore
+.secrets export-ignore
+**/.secrets export-ignore
+.secrets/** export-ignore
+**/.secrets/** export-ignore
+.playwright-cli export-ignore
+**/.playwright-cli export-ignore
+.playwright-cli/** export-ignore
+**/.playwright-cli/** export-ignore
+.codex export-ignore
+**/.codex export-ignore
+.codex/** export-ignore
+**/.codex/** export-ignore
+.claude export-ignore
+**/.claude export-ignore
+.claude/** export-ignore
+**/.claude/** export-ignore
+.omo export-ignore
+**/.omo export-ignore
+.omo/** export-ignore
+**/.omo/** export-ignore
+.reasonix export-ignore
+**/.reasonix export-ignore
+.reasonix/** export-ignore
+**/.reasonix/** export-ignore
+# Do not publish private signing keys, package-manager tokens or local captures.
+*.p12 -diff export-ignore
+**/*.p12 -diff export-ignore
+*.pfx -diff export-ignore
+**/*.pfx -diff export-ignore
+*.jks -diff export-ignore
+**/*.jks -diff export-ignore
+*.keystore -diff export-ignore
+**/*.keystore -diff export-ignore
+.npmrc -diff export-ignore
+**/.npmrc -diff export-ignore
+.pypirc -diff export-ignore
+**/.pypirc -diff export-ignore
+.netrc -diff export-ignore
+**/.netrc -diff export-ignore
+.ssh export-ignore
+**/.ssh export-ignore
+.ssh/** export-ignore
+**/.ssh/** export-ignore
+.aws export-ignore
+**/.aws export-ignore
+.aws/** export-ignore
+**/.aws/** export-ignore
+/data export-ignore
+/data/** export-ignore
+/output export-ignore
+/output/** export-ignore
+/screenshots export-ignore
+/screenshots/** export-ignore
+/audit_screenshots export-ignore
+/audit_screenshots/** export-ignore
+/cookies.txt -diff export-ignore
+/login.html export-ignore
+/routes.txt export-ignore
+/body.md export-ignore
 /public/images/flags/** export-ignore
 
 # make sure executable/build-control text has the right line endings

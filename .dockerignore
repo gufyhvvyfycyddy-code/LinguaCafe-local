@@ -1,6 +1,35 @@
 .git
-.env
-.env.*
+.env*
+**/.env*
+**/*.pem
+**/*.key
+**/*secret*
+**/credentials*
+**/.secrets/**
+**/.playwright-cli/**
+**/.codex/**
+**/.claude/**
+**/.omo/**
+**/.reasonix/**
+# Keep local credentials and browser traces out even when using a dirty
+# development working tree as a direct Docker context.
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/.npmrc
+**/.pypirc
+**/.netrc
+**/.ssh/**
+**/.aws/**
+/data
+/output
+/screenshots
+/audit_screenshots
+/cookies.txt
+/login.html
+/routes.txt
+/body.md
 node_modules
 mobile
 /desktop
