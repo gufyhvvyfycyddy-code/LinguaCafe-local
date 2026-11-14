@@ -82,7 +82,7 @@ public sealed class RuntimeManager
         }
 
         report("正在启动独立 MySQL / Redis / tokenizer…");
-        await RunDockerAsync([.. common, "up", "-d", "--wait", "--wait-timeout", "120", "mysql", "redis", "python"], runtimeRoot, cancellationToken);
+        await RunDockerAsync([.. common, "up", "-d", "--wait", "--wait-timeout", "600", "mysql", "redis", "python"], runtimeRoot, cancellationToken);
 
         report("正在初始化 PC 测试数据库…");
         await RunDockerAsync([.. common, "run", "--rm", "web", "php", "artisan", "migrate", "--force"], runtimeRoot, cancellationToken);

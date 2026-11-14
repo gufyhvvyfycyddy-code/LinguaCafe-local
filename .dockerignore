@@ -8,6 +8,9 @@
 **/.secrets/**
 **/.playwright-cli/**
 **/.codex/**
+**/.opencode/**
+**/.codebuddy/**
+**/.trae/**
 **/.claude/**
 **/.omo/**
 **/.reasonix/**

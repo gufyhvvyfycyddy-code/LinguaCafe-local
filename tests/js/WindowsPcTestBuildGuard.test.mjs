@@ -37,10 +37,12 @@ assert.match(dockerignore, /^\/desktop$/m);
 assert.match(dockerignore, /^\.env\*$/m);
 assert.match(dockerignore, /^\*\*\/\.env\*$/m);
 assert.match(dockerignore, /^\*\*\/\.playwright-cli\/\*\*$/m);
+assert.match(dockerignore, /^\*\*\/\.opencode\/\*\*$/m);
 const attrs = read('.gitattributes');
 assert.match(attrs, /^\.env\* -diff export-ignore$/m);
 assert.match(attrs, /^\*\*\/\.env\* -diff export-ignore$/m);
 assert.match(attrs, /^\.playwright-cli\/\*\* export-ignore$/m);
+assert.match(attrs, /^\.opencode\/\*\* export-ignore$/m);
 for (const file of ['.envrc', '.env_backup', '.env-prod', 'nested/.envrc']) {
   assert.match(file, /(^|\/)\.env[^/]*/i);
 }
@@ -66,7 +68,7 @@ assert.match(runtime, /org.opencontainers.image.revision/);
 assert.match(runtime, /COMPOSE_DISABLE_ENV_FILE/);
 assert.match(runtime, /PC_TEST_RUNTIME_VERSION/);
 assert.match(runtime, /runtimeImageTag != "dev"/);
-assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "120", "mysql", "redis", "python"/);
+assert.match(runtime, /"up", "-d", "--wait", "--wait-timeout", "600", "mysql", "redis", "python"/);
 assert.match(runtime, /"migrate", "--force"/);
 assert.match(runtime, /"db:seed", "--force"/);
 assert.match(runtime, /dictionary:import-ecdict/);
@@ -132,12 +134,17 @@ foreach ($unsafe in @($false, $true)) {
   $zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
   [void]$zip.CreateEntry('.playwright-cli/')
   [void]$zip.CreateEntry('safe.txt')
-  if ($unsafe) { [void]$zip.CreateEntry('nested/.envrc') }
+  if ($unsafe) {
+    [void]$zip.CreateEntry('nested/.envrc')
+    [void]$zip.CreateEntry('.opencode/')
+    [void]$zip.CreateEntry('.codebuddy/')
+    [void]$zip.CreateEntry('.trae/')
+  }
   $zip.Dispose()
   $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
 ${scanner}
   $archive.Dispose()
-  if ($unsafeCount -ne (1 + [int]$unsafe)) { throw 'Archive scan did not reject browser directory and secret file' }
+  if ($unsafeCount -ne (1 + 4 * [int]$unsafe)) { throw 'Archive scan did not reject browser directory and secret file' }
 }
 `, 'utf8');
     const scanResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', scanFile],
