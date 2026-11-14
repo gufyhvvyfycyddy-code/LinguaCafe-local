@@ -75,6 +75,8 @@ assert.match(runtime, /dictionary:import-ecdict/);
 assert.match(runtime, /PC_TEST_ECDICT_CSV/);
 assert.doesNotMatch(runtime, /migrate:fresh|migrate:refresh|migrate:reset|db:wipe/);
 
+assert.equal((windowCode.match(/LinguaCafePCTestStudyV4/g) ?? []).length, 2);
+assert.doesNotMatch(windowCode, /"LinguaCafePCTest"/);
 assert.match(windowCode, /\/setup/);
 assert.match(windowCode, /\/login/);
 assert.match(windowCode, /input\[autocomplete="email"\]/);
