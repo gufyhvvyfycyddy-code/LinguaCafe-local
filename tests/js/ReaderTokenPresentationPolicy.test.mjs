@@ -18,6 +18,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const textReaderSource = fs.readFileSync(path.join(root, 'resources/js/components/TextReader/TextReader.vue'), 'utf8');
 const textBlockSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/TextBlockGroup.vue'), 'utf8');
 const textBlockScss = fs.readFileSync(path.join(root, 'resources/sass/Text/TextBlockGroup.scss'), 'utf8');
+const interactiveTextScss = fs.readFileSync(path.join(root, 'resources/sass/Text/InteractiveTextStyling.scss'), 'utf8');
+
+test('keeps English Reader words inline for real multiword find without changing plain text or section markers', () => {
+    assert.match(textBlockSource, /'english-word-flow':\s*\$props\.language === 'english'/);
+    assert.match(textBlockSource, /reader-section-marker/);
+    assert.match(interactiveTextScss, /\.text-block-group\.english-word-flow:not\(\.plain-text-mode\) \.text-block \.word:not\(\.reader-section-marker\)/);
+    assert.match(interactiveTextScss, /display: inline;[\s\S]*?&\.space-after\s*\{\s*margin-right: 0;/);
+});
 
 test('applies spaceless layout only to the established languages', () => {
     assert.equal(usesReaderSpacelessLanguage('chinese'), true);

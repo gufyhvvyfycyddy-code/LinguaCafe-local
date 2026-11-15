@@ -4,7 +4,8 @@
             'text-block-group': true,
             'plain-text-mode': plainTextMode,
             'w-100': true,
-            'spaceless-language': usesSpacelessLanguage()
+            'spaceless-language': usesSpacelessLanguage(),
+            'english-word-flow': $props.language === 'english'
         }"
     >
         <!-- Delete phrase dialog -->
@@ -74,7 +75,7 @@
                 --><div v-else-if="word.is_structure && word.word === 'PARAGRAPH_BREAK'" style="display:block;height:1.2em;clear:both;"></div><!--
                 --><span
                     v-else-if="word.is_structure && isSectionMarker(word.word)"
-                    class="word selected-font"
+                    class="word selected-font reader-section-marker"
                     :style="{'margin-bottom': (lineSpacing * 4) + 'px', 'font-weight': 'bold'}"
                     :wordindex="wordIndex"
                     :stage="word.stage"

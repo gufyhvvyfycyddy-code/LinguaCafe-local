@@ -161,6 +161,15 @@
 
 }
 
+// English word text must remain in one inline flow for native phrase search.
+.text-block-group.english-word-flow:not(.plain-text-mode) .text-block .word:not(.reader-section-marker) {
+    display: inline;
+
+    &.space-after {
+        margin-right: 0;
+    }
+}
+
 // padding for spaceless languages (Chinese, Japanese, Thai...)
 .sample-text.spaceless-language .word, 
 .text-block-group.spaceless-language .word {
