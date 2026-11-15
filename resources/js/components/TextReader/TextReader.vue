@@ -511,7 +511,7 @@
                 readingContinuityLayoutRestoreTimer: null,
 
                 // AI reading assist / explicit unfamiliar targets
-                aiTranslationMode: 'hidden',
+                aiTranslationMode: 'visible',
                 hasSavedAiAssist: false,
                 aiSentenceTranslations: [],
                 assistVerificationItems: [],
@@ -2039,6 +2039,7 @@
                 return axios.get('/chapters/ai-assist/current/' + this.chapterId).then((response) => {
                     const data = response.data || {};
                     if (data.success) {
+                        if (data.has_saved_assist && !this.hasSavedAiAssist) this.aiTranslationMode = 'visible';
                         this.hasSavedAiAssist = data.has_saved_assist;
                         this.aiSentenceTranslations = data.sentence_translations || [];
                         this.assistVerificationItems = normalizeReadingSenseVerificationItems(data);
