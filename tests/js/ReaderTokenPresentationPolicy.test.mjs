@@ -27,6 +27,15 @@ test('keeps English Reader words inline for real multiword find without changing
     assert.match(interactiveTextScss, /display: inline;[\s\S]*?&\.space-after\s*\{\s*margin-right: 0;/);
 });
 
+test('normal English Reader copy uses selected word spacing without hijacking native copy', () => {
+    assert.match(textBlockSource, /window\.addEventListener\('copy', this\.copySelectedEnglishText\)/);
+    assert.match(textBlockSource, /window\.removeEventListener\('copy', this\.copySelectedEnglishText\)/);
+    assert.match(textBlockSource, /this\.\$props\.language !== 'english' \|\| this\.\$props\.plainTextMode/);
+    assert.match(textBlockSource, /window\.getSelection\(\)\?\.toString\(\)/);
+    assert.match(textBlockSource, /word\.spaceAfter \? ' ' : ''/);
+    assert.match(textBlockSource, /event\.clipboardData\.setData\('text\/plain', text\)/);
+});
+
 test('applies spaceless layout only to the established languages', () => {
     assert.equal(usesReaderSpacelessLanguage('chinese'), true);
     assert.equal(usesReaderSpacelessLanguage('japanese'), true);

@@ -416,6 +416,7 @@
             window.addEventListener('mouseup', this.unselectAllWordsOnEmptyClick);
             window.addEventListener('keydown', this.hotkeyHandle);
             window.addEventListener('mousemove', this.closeHoverBox);
+            window.addEventListener('copy', this.copySelectedEnglishText);
             window.addEventListener('popstate', this.handleMobileSheetPopState);
 
             axios.get('/settings/get-anki-settings').then((response) => {
@@ -440,6 +441,7 @@
             window.removeEventListener('mouseup', this.unselectAllWordsOnEmptyClick);
             window.removeEventListener('keydown', this.hotkeyHandle);
             window.removeEventListener('mousemove', this.closeHoverBox);
+            window.removeEventListener('copy', this.copySelectedEnglishText);
             window.removeEventListener('popstate', this.handleMobileSheetPopState);
             this.disarmMobileSheetHistory(false);
         },
@@ -1395,6 +1397,30 @@
                         this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'apiTranslations', value: ['error'] });
                     });
                 }
+            },
+            copySelectedEnglishText(event) {
+                // Normal Reader uses its own word selection, not the browser's native range.
+                // Leave native copy, input fields, overlays and plain-text mode untouched.
+                if (this.$props.language !== 'english' || this.$props.plainTextMode
+                    || !this.selection.length || !event.clipboardData
+                    || window.getSelection()?.toString()) {
+                    return;
+                }
+                const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+                if (target?.closest?.('input, textarea, select, [contenteditable], .v-dialog--active, .v-menu__content--active, .v-overlay--active')) {
+                    return;
+                }
+
+                const text = this.selection
+                    .map(word => String(word.word || '') + (word.spaceAfter ? ' ' : ''))
+                    .join('')
+                    .trimEnd();
+                if (!text) {
+                    return;
+                }
+
+                event.clipboardData.setData('text/plain', text);
+                event.preventDefault();
             },
             unselectAllWordsOnEmptyClick(event) {
                 // Normalize event.target to an Element (may be a text node)
