@@ -300,6 +300,12 @@ fallback 必须在 `PARAGRAPH_BREAK`、`NEWLINE` 和 section marker 处结束当
 - 独立审查分支 `task/k02-b007-reader-dom-spaces-20261112`：普通英文阅读词元的 `spaceAfter` 在原有逐词 span 内输出真实 ASCII 空格；`plainTextMode` 原 `NBSP` 保留，非英文普通阅读不改；没有修改原 `wordindex`、点击事件、Vuex、CSS margin、WordSense/FSRS。
 - 现有 ReaderTokenPresentationPolicy 17/17、ReaderPhaseASafetyGuard 8/8、ReaderDragSelectionPolicy 12/12 通过，Vue Laravel Mix开发编译成功。静态合同和编译不能证明真实 DOM 复制、屏幕阅读器或短语高亮几何效果；**FIXED-WAITING-VERIFY，B-007 不关闭**，只有在登录后的阅读页真实操作、普通/纯文本模式复制、空格语义和拖选/高亮全部通过后才可正式验收。
 
+#### 2026-11-15 最新运行验收（原Bug编号继续使用；尚未最终关闭）
+- 在唯一隔离 PC Test V4 的审查分支 `review/k02-b007-reader-spaces-20261115`，真实安装的 `d1a5c050953d8ba3b5427f3d2f900173339e594d` 版本中，英文 Reader 单词 DOM 包含真实 ASCII 空格，行内排版让 Chrome 浏览器跨词搜索 `It is necessary` 返回匹配；5句已存中文译文默认可见，逐词点击显示真实词典侧栏。
+- 真实 Chrome 等待译文、字体和布局稳定后，1450px/900px 各8次鼠标拖选 `necessary to consider separately`，合计 **16/16** 精确高亮4词；此前 0词/14词差异是测试读取坐标后布局移动、按下位置实际落在不同 `wordindex`，不能把它直接判为已证实的产品拖选Bug。
+- 普通模式之前的 Ctrl+C 无法复制应用自定义选区：剪贴板保持测试哨兵；`d1a5c050` 最小修复仅拦截无原生Selection且有当前英文选区的 `copy` 事件，在真实 Chrome GUI 中复制得到 `necessary to consider separately`；纯文本模式原生 Ctrl+C 也得到同样带空格词组，均为本机隔离上下文读取，未外传剪贴板。现有相邻JS测试48/48通过，Windows+Docker同一源码版本已正式构建、镜像标签一致且安装安全门通过；隔离 FSRS WordSense=1/Card=1/Log=2 前后稳定。
+- **验收边界：Chrome关键可用性 Stage Accepted，但整个 B-007 仍 FIXED-WAITING-VERIFY**。需要 WPF 内嵌 WebView2 独立阅读、复制及产品负责人复测；本机 WPF 与Chrome共用测试管理员导致交叉登录时受到现有 `UserController::authenticateUser() → Auth::logoutOtherDevices()` 会话踢出策略影响。2026-11-15 RUN250 已在真实 WPF 的UIA中复现点击“继续学习”后 `Unauthenticated.`，独立重启WPF自动登录后首页再次显示已认证统计，但后续 Reader UIA 状态仍需单独核实。不能将跨客户端认证踢出误归因于文本排版改动，也不能将启动进程与 Web Chrome 结果冒充 WPF 的全部体验验收。详细证据只追加在 `D:\AI-Tools\STUDY_WORKFLOW_MASTER_TEST_AND_HANDOFF.md` RUN247–250。
+
 ### [Bug][后端问题][P1] B-008 Jellyfin 缺失设置导致普通导入窗口返回 500
 
 #### 现象
