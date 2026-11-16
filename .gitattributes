@@ -88,6 +88,12 @@ credentials* -diff export-ignore
 /body.md export-ignore
 /public/images/flags/** export-ignore
 
+# Windows PC Test source bundles never need GitHub automation workflows.
+# Historical task branches can contain unsafe comment-triggered executors;
+# keep them out of distributable archives without changing other Git refs.
+/.github export-ignore
+/.github/** export-ignore
+
 # make sure executable/build-control text has the right line endings
 *.sh text eol=lf
 *.patch text eol=lf

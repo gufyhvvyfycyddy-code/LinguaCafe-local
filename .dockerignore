@@ -1,4 +1,6 @@
 .git
+# Deployment images must not carry historical GitHub automation workflows.
+.github
 .env*
 **/.env*
 **/*.pem
