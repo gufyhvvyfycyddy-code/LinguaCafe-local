@@ -1,3 +1,5 @@
+param([switch]$StageOnly)
+
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -108,6 +110,10 @@ try {
     # Previous app directories remain immutable. Switch only the shortcut.
     Move-Item -LiteralPath $stageDir -Destination $releaseDir
     $stageDir = $null
+    if ($StageOnly) {
+        Write-Host "Staged PC Test revision $commit at $releaseDir. Desktop shortcut remains unchanged pending real GUI validation."
+        return
+    }
     try {
         if (Test-Path -LiteralPath $shortcutPath) {
             $shortcutBackup = Join-Path $installRoot ("shortcut-before-" + $nonce + ".lnk")
