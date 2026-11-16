@@ -13,9 +13,10 @@ public sealed class RuntimeManager
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private string runtimeImageTag = "dev";
-    private readonly string appDataRoot = Path.Combine(
+    private readonly string appDataRoot = Path.Combine(@"D:\AI-Tools", "LinguaCafe", "PC-Test");
+    private static readonly string LegacyStatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LinguaCafePCTestStudyV4");
+        "LinguaCafePCTestStudyV4", "state.json");
 
     public string StatePath => Path.Combine(appDataRoot, "state.json");
 
@@ -26,6 +27,12 @@ public sealed class RuntimeManager
         {
             return JsonSerializer.Deserialize<PcTestState>(File.ReadAllText(StatePath), JsonOptions)
                 ?? throw new InvalidOperationException("PC test state is invalid.");
+        }
+
+        if (File.Exists(LegacyStatePath))
+        {
+            throw new InvalidOperationException(
+                "Existing PC test identity is still on C drive. Verify and copy its state.json to the D-drive PC Test folder before starting.");
         }
 
         var state = new PcTestState
@@ -156,7 +163,8 @@ public sealed class RuntimeManager
             {
                 if (Directory.Exists(target))
                 {
-                    Directory.Delete(target, recursive: true);
+                    throw new InvalidOperationException(
+                        "PC test runtime directory exists without its ready marker. Verify the folder manually; refusing to delete unknown data.");
                 }
                 Directory.CreateDirectory(target);
                 ZipFile.ExtractToDirectory(packagedZip, target);
