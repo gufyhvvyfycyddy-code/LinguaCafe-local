@@ -8,10 +8,7 @@ namespace LinguaCafe.PcTest;
 public partial class MainWindow : Window
 {
     private readonly RuntimeManager runtime = new();
-    private readonly string startupLogPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LinguaCafePCTestStudyV4",
-        "startup.log");
+    private readonly string startupLogPath = Path.Combine(RuntimeManager.DataRoot, "startup.log");
     private PcTestState state = null!;
 
     public MainWindow()
@@ -29,10 +26,7 @@ public partial class MainWindow : Window
             await runtime.PrepareAsync(UpdateStatus, CancellationToken.None);
 
             UpdateStatus("正在初始化桌面窗口…");
-            var profile = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LinguaCafePCTestStudyV4",
-                "WebView2");
+            var profile = Path.Combine(RuntimeManager.DataRoot, "WebView2");
             var webViewEnvironment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             await Browser.EnsureCoreWebView2Async(webViewEnvironment);
             Browser.CoreWebView2.Settings.AreDevToolsEnabled = true;

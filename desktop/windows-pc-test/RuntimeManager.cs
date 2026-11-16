@@ -13,7 +13,8 @@ public sealed class RuntimeManager
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private string runtimeImageTag = "dev";
-    private readonly string appDataRoot = Path.Combine(@"D:\AI-Tools", "LinguaCafe", "PC-Test");
+    internal static readonly string DataRoot = Path.Combine(@"D:\AI-Tools", "LinguaCafe", "PC-Test");
+    private readonly string appDataRoot = DataRoot;
     private static readonly string LegacyStatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "LinguaCafePCTestStudyV4", "state.json");
