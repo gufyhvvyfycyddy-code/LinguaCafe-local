@@ -169,13 +169,13 @@ class AiReadingAssistV2Service
         ChapterAiReadingAssist $record,
     ): array {
         $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
-        $currentScopeHash = $this->targetScopeHash($catalog['targets']);
-        if (!$record->source_revision
-            || $record->source_revision !== $catalog['source_revision']
-            || !$record->target_scope_hash
-            || !hash_equals($record->target_scope_hash, $currentScopeHash)) {
+        $sourceStale = !$record->source_revision || $record->source_revision !== $catalog['source_revision'];
+        $scopeStale = !$record->target_scope_hash
+            || !hash_equals($record->target_scope_hash, $this->targetScopeHash($catalog['targets']));
+        if ($sourceStale || $scopeStale) {
             return [
                 'assist_stale' => true,
+                'source_stale' => $sourceStale,
                 'verification_items' => [],
             ];
         }
@@ -212,6 +212,8 @@ class AiReadingAssistV2Service
                     'resolution' => $evidence->resolution,
                     'word_sense_id' => $evidence->word_sense_id,
                     'resolution_source' => $evidence->resolution_source,
+                    'binding_current' => $evidence->resolution_source !== \App\Models\ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI
+                        || $this->evidenceService->isTrustedCandidateSnapshotCurrent($evidence, $target),
                 ] : null,
             ]);
         }
@@ -989,11 +991,22 @@ class AiReadingAssistV2Service
                 $target['candidate_word_senses'] ?? [],
             );
             sort($candidateIds);
-            $scope[] = [
+            $entry = [
                 'occurrence_id' => $target['occurrence_id'],
                 'purpose' => $target['purpose'],
                 'candidate_ids' => $candidateIds,
             ];
+            if ($candidateIds !== []) {
+                $meanings = array_map(static fn (array $candidate): array => [
+                    'id' => (int) $candidate['word_sense_id'],
+                    'sense_zh' => $candidate['sense_zh'] ?? null,
+                    'sense_en' => $candidate['sense_en'] ?? null,
+                    'pos' => $candidate['pos'] ?? null,
+                ], $target['candidate_word_senses']);
+                usort($meanings, static fn (array $a, array $b): int => $a['id'] <=> $b['id']);
+                $entry['candidate_meanings'] = $meanings;
+            }
+            $scope[] = $entry;
         }
 
         return 'sha256:' . hash('sha256', json_encode($scope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));

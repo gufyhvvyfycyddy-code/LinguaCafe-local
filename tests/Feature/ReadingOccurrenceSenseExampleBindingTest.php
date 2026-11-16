@@ -206,6 +206,287 @@ class ReadingOccurrenceSenseExampleBindingTest extends TestCase
         $this->assertTrue($this->snapshotService->matches($card->fresh(), $snapshot));
     }
 
+    public function test_trusted_ai_binding_does_not_survive_same_id_meaning_edit_while_user_binding_remains_valid(): void
+    {
+        $sense = $this->createSense('bank-ai-stale', 'bank', '银行');
+        $target = $this->bankTarget();
+        $this->evidenceService->storeTrustedAiMatches(
+            $this->user->id,
+            'english',
+            $this->chapter->id,
+            [[
+                'target' => $target,
+                'word_sense_id' => $sense->id,
+                'confidence' => 'high',
+                'package_id' => 'pkg-ai-semantic-stale',
+            ]],
+            'sha256:pkg-ai-semantic-stale',
+        );
+
+        $evidence = ReadingOccurrenceSenseEvidence::query()
+            ->where('user_id', $this->user->id)
+            ->where('chapter_id', $this->chapter->id)
+            ->where('occurrence_id', $target['occurrence_id'])
+            ->firstOrFail();
+        $this->assertSame(ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI, $evidence->resolution_source);
+        $this->assertTrue($this->evidenceService->isCurrentConfirmedBinding(
+            $evidence, $this->user->id, 'english',
+        ));
+
+        // A new candidate for an unrelated word in the same chapter must not
+        // revoke the bank occurrence's own still-valid AI binding.
+        $this->createSense('reopen-unrelated', 'reopen', '重新开放');
+        $this->assertTrue($this->evidenceService->isCurrentConfirmedBinding(
+            $evidence->fresh(), $this->user->id, 'english',
+        ));
+
+        $sense->forceFill(['sense_zh' => '河岸'])->save();
+        $this->assertFalse(
+            $this->evidenceService->isCurrentConfirmedBinding($evidence->fresh(), $this->user->id, 'english'),
+            'A same-ID meaning edit must revoke pre-edit Trust-AI scoring eligibility.',
+        );
+        $currentEvidence = $this->evidenceService->listForChapter(
+            $this->user->id, 'english', $this->chapter->id,
+        );
+        $shown = collect($currentEvidence['items'])->firstWhere('occurrence_id', $target['occurrence_id']);
+        $this->assertNotNull($shown);
+        $this->assertFalse($shown['binding_current'], 'Reader must not advertise expired AI evidence as a current binding.');
+
+        $this->evidenceService->storeUserDecision(
+            $this->user->id,
+            'english',
+            $this->chapter->id,
+            $target['occurrence_id'],
+            ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+            $sense->id,
+        );
+        $this->assertTrue(
+            $this->evidenceService->isCurrentConfirmedBinding(
+                $evidence->fresh(), $this->user->id, 'english',
+            ),
+            'A current explicit user decision must remain authoritative.',
+        );
+        $this->assertSame(0, ReviewLog::count());
+    }
+
+    public function test_legacy_trust_ai_without_candidate_fingerprint_is_not_scoring_evidence(): void
+    {
+        $sense = $this->createSense('bank-legacy-ai', 'bank', '银行');
+        $target = $this->bankTarget();
+        $this->evidenceService->storeTrustedAiMatches(
+            $this->user->id, 'english', $this->chapter->id,
+            [[
+                'target' => $target,
+                'word_sense_id' => $sense->id,
+                'confidence' => 'high',
+                'package_id' => 'pkg-legacy-ai',
+            ]],
+            'sha256:pkg-legacy-ai',
+        );
+        $row = ReadingOccurrenceSenseEvidence::query()
+            ->where('user_id', $this->user->id)
+            ->where('chapter_id', $this->chapter->id)
+            ->where('occurrence_id', $target['occurrence_id'])
+            ->firstOrFail();
+        $this->assertTrue($this->evidenceService->isCurrentConfirmedBinding(
+            $row, $this->user->id, 'english',
+        ));
+
+        $row->provenance = ['source' => 'ai_reading_assist_v2', 'authority' => 'trust_ai'];
+        $row->save();
+        $this->assertFalse($this->evidenceService->isCurrentConfirmedBinding(
+            $row->fresh(), $this->user->id, 'english',
+        ));
+        $this->assertSame(1, ReadingOccurrenceSenseEvidence::count());
+        $this->assertSame(0, ReviewLog::count());
+    }
+
+    public function test_real_reader_finish_cannot_apply_old_trust_ai_good_after_same_id_meaning_edit(): void
+    {
+        $sense = $this->createSense('bank-ai-finish', 'bank', '银行');
+        $card = $this->cardService->ensureSenseCard($sense)->fresh();
+        $anchor = now()->subHours(26);
+        $card->forceFill([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_step_index' => null,
+            'fsrs_due_at' => now()->addDays(30),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 4,
+            'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => $anchor,
+        ])->save();
+        ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'reviewed_at' => $anchor,
+            'previous_state' => 'review',
+            'new_state' => 'review',
+            'source' => ReviewLog::SOURCE_SENSE_REVIEW,
+        ]);
+        $beforeFsrs = $this->snapshotService->capture($card->fresh());
+        $session = app(ReadingSessionService::class)->startSession(
+            $this->user->id, 'english', $this->chapter->id,
+        );
+        $target = $this->bankTarget();
+        $this->evidenceService->storeTrustedAiMatches(
+            $this->user->id, 'english', $this->chapter->id,
+            [[
+                'target' => $target,
+                'word_sense_id' => $sense->id,
+                'confidence' => 'high',
+                'package_id' => 'pkg-ai-real-finish',
+            ]],
+            'sha256:pkg-ai-real-finish',
+        );
+        $finish = app(\App\Services\ReadingFinishSettlementService::class);
+        $args = [
+            $this->user->id, 'english', $this->chapter->id,
+            $session['reading_session_id'], false, [], false, [], [],
+        ];
+        $valid = $finish->finishChapterWithSession(...[...$args, 'preflight']);
+        $this->assertSame(1, $valid['passive_good_count']);
+        $this->assertSame(1, ReviewLog::count());
+
+        $sense->forceFill(['sense_zh' => '河岸'])->save();
+        $stale = $finish->finishChapterWithSession(...[...$args, 'preflight']);
+        $this->assertSame(0, $stale['passive_good_count']);
+        $this->assertSame([], $stale['eligible_settlements']);
+        $this->assertSame(1, ReviewLog::count());
+
+        $committed = $finish->finishChapterWithSession(...[...$args, 'commit']);
+        $this->assertSame(0, $committed['passive_good_count']);
+        $this->assertSame(1, ReviewLog::count());
+        $this->assertTrue($this->snapshotService->matches($card->fresh(), $beforeFsrs));
+    }
+
+    public function test_stale_trust_ai_source_example_drops_out_of_review_pool_until_user_reconfirms(): void
+    {
+        $sense = $this->createSense('bank-ai-review-example', 'bank', '银行');
+        $target = $this->bankTarget();
+        $this->evidenceService->storeTrustedAiMatches(
+            $this->user->id,
+            'english',
+            $this->chapter->id,
+            [[
+                'target' => $target,
+                'word_sense_id' => $sense->id,
+                'confidence' => 'high',
+                'package_id' => 'pkg-ai-source-example',
+            ]],
+            'sha256:pkg-ai-source-example',
+        );
+        $sentence = 'The bank reopened.';
+        $this->assertContains($sentence, $this->poolSentences($sense));
+        $this->assertSame(1, $this->readingSourceCount());
+
+        $sense->forceFill(['sense_zh' => '河岸'])->save();
+        $this->assertNotContains(
+            $sentence,
+            $this->poolSentences($sense),
+            'An old Trust-AI match must not teach a changed meaning through real-source review examples.',
+        );
+
+        $this->evidenceService->storeUserDecision(
+            $this->user->id,
+            'english',
+            $this->chapter->id,
+            $target['occurrence_id'],
+            ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+            $sense->id,
+        );
+        $this->assertContains($sentence, $this->poolSentences($sense));
+        $this->assertSame(1, $this->readingSourceCount());
+        $this->assertSame(0, ReviewLog::count());
+    }
+
+    public function test_source_revision_change_rejects_old_trust_ai_review_example(): void
+    {
+        $sense = $this->createSense('bank-ai-source-revision', 'bank', '银行');
+        $target = $this->bankTarget();
+        $this->evidenceService->storeTrustedAiMatches(
+            $this->user->id, 'english', $this->chapter->id,
+            [[
+                'target' => $target,
+                'word_sense_id' => $sense->id,
+                'confidence' => 'high',
+                'package_id' => 'pkg-ai-changed-english',
+            ]],
+            'sha256:pkg-ai-changed-english',
+        );
+        $this->assertContains('The bank reopened.', $this->poolSentences($sense));
+
+        $this->chapter->setProcessedText([
+            $this->token(0, 'The', 'the', 'determiner', true),
+            $this->token(1, 'bank', 'bank', 'noun', true),
+            $this->token(2, 'closed.', 'close', 'verb', false),
+        ]);
+        $this->chapter->raw_text = 'The bank closed.';
+        $this->chapter->save();
+
+        $this->assertNotContains('The bank reopened.', $this->poolSentences($sense));
+        $this->assertSame(1, $this->readingSourceCount());
+        $this->assertSame(0, ReviewLog::count());
+    }
+
+    public function test_current_v2_verification_does_not_mark_legacy_trust_ai_evidence_current(): void
+    {
+        $sense = $this->createSense('bank-ai-v2-status', 'bank', '银行');
+        $target = $this->bankTarget();
+        $this->evidenceService->storeTrustedAiMatches(
+            $this->user->id, 'english', $this->chapter->id,
+            [[
+                'target' => $target,
+                'word_sense_id' => $sense->id,
+                'confidence' => 'high',
+                'package_id' => 'pkg-legacy-status',
+            ]],
+            'sha256:pkg-legacy-status',
+        );
+
+        $catalog = $this->catalogService->build($this->user->id, 'english', $this->chapter->id);
+        $v2 = app(\App\Services\AiReadingAssistV2Service::class);
+        $record = ChapterAiReadingAssist::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'schema_version' => $v2::SCHEMA_VERSION,
+            'source_revision' => $catalog['source_revision'],
+            'target_scope_hash' => $v2->targetScopeHash($catalog['targets']),
+            'sentence_translations' => [],
+            'validated_payload' => ['word_results' => [[
+                'occurrence_id' => $target['occurrence_id'],
+                'result' => 'matched_existing',
+                'confidence' => 'high',
+                'word_sense_id' => $sense->id,
+            ]]],
+        ]);
+        $current = $v2->currentVerificationItems(
+            $this->user->id, 'english', $this->chapter->id, $record,
+        );
+        $this->assertFalse($current['assist_stale']);
+        $this->assertTrue($current['verification_items'][0]['evidence']['binding_current']);
+
+        $evidence = ReadingOccurrenceSenseEvidence::query()
+            ->where('user_id', $this->user->id)
+            ->where('chapter_id', $this->chapter->id)
+            ->where('occurrence_id', $target['occurrence_id'])
+            ->firstOrFail();
+        $evidence->provenance = ['source' => 'ai_reading_assist_v2', 'authority' => 'trust_ai'];
+        $evidence->save();
+        $legacy = $v2->currentVerificationItems(
+            $this->user->id, 'english', $this->chapter->id, $record->fresh(),
+        );
+        $this->assertFalse($legacy['assist_stale']);
+        $this->assertFalse($legacy['verification_items'][0]['evidence']['binding_current']);
+        $this->assertSame(0, ReviewLog::count());
+    }
+
     public function test_exact_current_saved_translation_enriches_source_occurrence(): void
     {
         $sense = $this->createSense('bank-translation', 'bank', '银行');

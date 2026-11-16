@@ -176,6 +176,7 @@ class ReadingOccurrenceSenseEvidenceService
                     'provenance' => [
                         'source' => 'ai_reading_assist_v2',
                         'authority' => 'trust_ai',
+                        'candidate_scope_hash' => $this->candidateScopeHash($current),
                     ],
                 ]);
                 $evidence->save();
@@ -230,6 +231,10 @@ class ReadingOccurrenceSenseEvidenceService
         foreach ($rows as $row) {
             $target = $catalog['targets_by_id'][$row->occurrence_id] ?? null;
             $sense = $row->word_sense_id ? $confirmed->get($row->word_sense_id) : null;
+            $bindingCurrent = $row->resolution !== ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING || $sense !== null;
+            if ($bindingCurrent && $row->resolution_source === ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI) {
+                $bindingCurrent = $this->isTrustedCandidateSnapshotCurrent($row, $target);
+            }
             $items[] = [
                 'occurrence_id' => $row->occurrence_id,
                 'start_word_index' => $row->start_word_index,
@@ -241,7 +246,7 @@ class ReadingOccurrenceSenseEvidenceService
                 'resolution' => $row->resolution,
                 'word_sense_id' => $row->word_sense_id,
                 'resolution_source' => $row->resolution_source,
-                'binding_current' => $row->resolution !== ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING || $sense !== null,
+                'binding_current' => $bindingCurrent,
                 'candidate_word_senses' => $target['candidate_word_senses'] ?? [],
             ];
         }
@@ -278,9 +283,22 @@ class ReadingOccurrenceSenseEvidenceService
         ReadingOccurrenceSenseEvidence $evidence,
         int $userId,
         string $language,
+        ?array $currentTarget = null,
     ): bool {
         if ($evidence->resolution !== ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING || !$evidence->word_sense_id) {
             return false;
+        }
+
+        if ($evidence->resolution_source === ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI) {
+            if ($currentTarget === null) {
+                $catalog = $this->targetCatalogService->build(
+                    $userId, $language, (int) $evidence->chapter_id,
+                );
+                $currentTarget = $catalog['targets_by_id'][$evidence->occurrence_id] ?? null;
+            }
+            if (!$this->isTrustedCandidateSnapshotCurrent($evidence, $currentTarget)) {
+                return false;
+            }
         }
 
         return WordSense::query()
@@ -289,6 +307,48 @@ class ReadingOccurrenceSenseEvidenceService
             ->where('language_id', $language)
             ->where('status', WordSense::STATUS_CONFIRMED)
             ->exists();
+    }
+
+    public function isTrustedCandidateSnapshotCurrent(
+        ReadingOccurrenceSenseEvidence $evidence,
+        ?array $currentTarget,
+    ): bool {
+        // Legacy AI evidence without a verifiable snapshot remains readable
+        // history, but is neither shown as current nor eligible for new Good.
+        $provenance = $evidence->provenance;
+        $savedHash = is_array($provenance) ? (string) ($provenance['candidate_scope_hash'] ?? '') : '';
+        $allowedIds = array_map(
+            static fn (array $candidate): int => (int) $candidate['word_sense_id'],
+            $currentTarget['candidate_word_senses'] ?? [],
+        );
+
+        return $savedHash !== ''
+            && in_array((int) $evidence->word_sense_id, $allowedIds, true)
+            && $currentTarget !== null
+            && (string) ($currentTarget['occurrence_id'] ?? '') === (string) $evidence->occurrence_id
+            && (string) ($currentTarget['purpose'] ?? '') === (string) $evidence->target_origin
+            && hash_equals($savedHash, $this->candidateScopeHash($currentTarget));
+    }
+
+    /**
+     * Fingerprint the meaning candidates for one real Reader occurrence.
+     * Ordering is irrelevant; a new, deleted or edited candidate invalidates
+     * an earlier AI choice without invalidating user-confirmed evidence.
+     */
+    private function candidateScopeHash(array $target): string
+    {
+        $meanings = array_map(static fn (array $candidate): array => [
+            'id' => (int) $candidate['word_sense_id'],
+            'sense_zh' => $candidate['sense_zh'] ?? null,
+            'sense_en' => $candidate['sense_en'] ?? null,
+            'pos' => $candidate['pos'] ?? null,
+        ], $target['candidate_word_senses'] ?? []);
+        usort($meanings, static fn (array $a, array $b): int => $a['id'] <=> $b['id']);
+
+        return 'sha256:' . hash('sha256', json_encode([
+            'purpose' => $target['purpose'] ?? null,
+            'candidate_meanings' => $meanings,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 
     private function validateResolution(

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Chapter;
+use App\Models\ReadingOccurrenceSenseEvidence;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use Illuminate\Support\Collection;
@@ -28,6 +29,12 @@ use Illuminate\Support\Collection;
  */
 class WordSenseExamplePoolService
 {
+    public function __construct(
+        private ReadingOccurrenceSenseEvidenceService $readingEvidenceService,
+        private ReadingTargetCatalogService $targetCatalogService,
+    ) {
+    }
+
     /**
      * Collect distinct real-source example candidates for a sense.
      *
@@ -76,6 +83,60 @@ class WordSenseExamplePoolService
                     && (int) $occurrence->user_id === (int) $sense->user_id
                     && (string) $occurrence->language_id === (string) $sense->language_id;
             });
+
+        // Reader-source rows backed by Trust AI are only valid for the sense
+        // candidates that were actually reviewed by that AI package. A later
+        // meaning edit must not keep the old English example in the new Sense.
+        // Batch the evidence lookup and cache canonical target catalogues by
+        // chapter, rather than repeating queries for every review candidate.
+        $readingEvidenceIds = $occurrences
+            ->filter(fn (WordSenseOccurrence $row): bool => $row->source === WordSenseOccurrence::SOURCE_READING_OCCURRENCE)
+            ->map(fn (WordSenseOccurrence $row): int => (int) (($row->evidence ?? [])['reading_occurrence_evidence_id'] ?? 0))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $evidenceById = $readingEvidenceIds === []
+            ? collect()
+            : ReadingOccurrenceSenseEvidence::query()->whereIn('id', $readingEvidenceIds)->get()->keyBy('id');
+        $catalogCache = [];
+        $occurrences = $occurrences->filter(function (WordSenseOccurrence $row) use ($evidenceById, &$catalogCache): bool {
+            if ($row->source !== WordSenseOccurrence::SOURCE_READING_OCCURRENCE) {
+                return true;
+            }
+            $evidenceId = (int) (($row->evidence ?? [])['reading_occurrence_evidence_id'] ?? 0);
+            if ($evidenceId === 0) {
+                // Unverifiable historical Trust AI cannot supply a rated example.
+                return (($row->evidence ?? [])['resolution_source'] ?? null)
+                    !== ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI;
+            }
+            $evidence = $evidenceById->get($evidenceId);
+            if (!$evidence || $evidence->resolution !== ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING
+                || (int) $evidence->word_sense_id !== (int) $row->word_sense_id
+                || (int) $evidence->user_id !== (int) $row->user_id
+                || (string) $evidence->language_id !== (string) $row->language_id) {
+                return false;
+            }
+            if ($evidence->resolution_source !== ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI) {
+                return true; // Explicit human decisions remain authoritative.
+            }
+            $chapterKey = $evidence->user_id.':'.$evidence->language_id.':'.$evidence->chapter_id;
+            if (!array_key_exists($chapterKey, $catalogCache)) {
+                try {
+                    $catalogCache[$chapterKey] = $this->targetCatalogService->build(
+                        (int) $evidence->user_id, (string) $evidence->language_id, (int) $evidence->chapter_id,
+                    );
+                } catch (\Throwable $exception) {
+                    $catalogCache[$chapterKey] = null;
+                }
+            }
+            $catalog = $catalogCache[$chapterKey];
+            return $catalog !== null
+                && (string) $evidence->source_revision === (string) $catalog['source_revision']
+                && $this->readingEvidenceService->isTrustedCandidateSnapshotCurrent(
+                    $evidence, $catalog['targets_by_id'][$evidence->occurrence_id] ?? null,
+                );
+        });
 
         $chapterIds = $occurrences->pluck('chapter_id')->filter()->unique()->values()->all();
         $chaptersById = [];

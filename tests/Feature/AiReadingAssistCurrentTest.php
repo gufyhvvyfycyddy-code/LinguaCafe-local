@@ -236,4 +236,78 @@ class AiReadingAssistCurrentTest extends TestCase
         $this->actingAs($this->user)->getJson('/chapters/ai-assist/current/' . $this->chapter->id)->assertOk();
         $this->assertEquals($originalCount, \App\Models\EncounteredWord::count());
     }
+
+    #[Test]
+    public function v2_keeps_saved_translation_when_only_target_scope_changes(): void
+    {
+        $revision = app(\App\Services\ReadingChapterTextService::class)->sourceRevision($this->chapter);
+        ChapterAiReadingAssist::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'schema_version' => \App\Services\AiReadingAssistV2Service::SCHEMA_VERSION,
+            'source_revision' => $revision,
+            'target_scope_hash' => 'sha256:outdated-targets',
+            'sentence_translations' => [
+                ['sentence_index' => 0, 'source_text' => 'This is a test chapter.', 'translation_zh' => '这是测试章节。'],
+            ],
+            'validated_payload' => ['word_results' => []],
+        ]);
+
+        $this->actingAs($this->user)
+            ->getJson('/chapters/ai-assist/current/' . $this->chapter->id)
+            ->assertOk()
+            ->assertJsonPath('has_saved_assist', true)
+            ->assertJsonPath('assist_stale', true)
+            ->assertJsonPath('source_stale', false)
+            ->assertJsonPath('sentence_translations.0.translation_zh', '这是测试章节。')
+            ->assertJsonPath('items', [])
+            ->assertJsonPath('verification_items', []);
+    }
+
+    #[Test]
+    public function v2_hides_translation_when_english_source_changes(): void
+    {
+        $revision = app(\App\Services\ReadingChapterTextService::class)->sourceRevision($this->chapter);
+        ChapterAiReadingAssist::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'schema_version' => \App\Services\AiReadingAssistV2Service::SCHEMA_VERSION,
+            'source_revision' => $revision,
+            'target_scope_hash' => 'sha256:outdated-targets',
+            'sentence_translations' => [
+                ['sentence_index' => 0, 'source_text' => 'This is a test chapter.', 'translation_zh' => '这是测试章节。'],
+            ],
+        ]);
+        $this->chapter->update(['raw_text' => 'The English source has changed.']);
+
+        $this->actingAs($this->user)
+            ->getJson('/chapters/ai-assist/current/' . $this->chapter->id)
+            ->assertOk()
+            ->assertJsonPath('has_saved_assist', false)
+            ->assertJsonPath('assist_stale', true)
+            ->assertJsonPath('source_stale', true)
+            ->assertJsonPath('sentence_translations', [])
+            ->assertJsonPath('items', []);
+    }
+
+    #[Test]
+    public function v2_target_scope_detects_same_id_candidate_meaning_changes(): void
+    {
+        $service = app(\App\Services\AiReadingAssistV2Service::class);
+        $target = [
+            'occurrence_id' => 'occ2_test',
+            'purpose' => 'passive_disambiguation',
+            'candidate_word_senses' => [[
+                'word_sense_id' => 7,
+                'sense_zh' => '旧义',
+                'sense_en' => 'old meaning',
+                'pos' => 'NOUN',
+            ]],
+        ];
+        $previous = $service->targetScopeHash([$target]);
+        $target['candidate_word_senses'][0]['sense_zh'] = '新义';
+        $this->assertNotSame($previous, $service->targetScopeHash([$target]));
+    }
 }

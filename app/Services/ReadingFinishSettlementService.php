@@ -279,7 +279,7 @@ class ReadingFinishSettlementService
                 $excludedOccurrenceIds[] = $occurrenceId;
                 continue;
             }
-            if (!$this->evidenceService->isCurrentConfirmedBinding($evidence, $userId, $language)) {
+            if (!$this->evidenceService->isCurrentConfirmedBinding($evidence, $userId, $language, $target)) {
                 $excludedOccurrenceIds[] = $occurrenceId;
                 continue;
             }

@@ -369,9 +369,11 @@ class AiReadingAssistService
                 $record,
             );
             if (($result['assist_stale'] ?? false) === true) {
-                $result['has_saved_assist'] = false;
-                $result['sentence_translations'] = [];
                 $result['items'] = [];
+                if (($result['source_stale'] ?? true) === true) {
+                    $result['has_saved_assist'] = false;
+                    $result['sentence_translations'] = [];
+                }
             }
         } else {
             $result['verification_items'] = [];
