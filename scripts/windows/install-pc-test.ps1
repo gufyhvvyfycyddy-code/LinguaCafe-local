@@ -79,6 +79,20 @@ try {
         if ($revision -ne $commit) {
             throw "Docker image source revision does not match archived commit."
         }
+
+        # Also inspect the final image: composer/pip can add files after .dockerignore filtering.
+        $imageRoot = if ($image -like "linguacafe-pc-test-web:*") { "/var/www/html" } else { "/app" }
+        $imagePaths = @(docker run --rm --network none --read-only --entrypoint find $image $imageRoot -print)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not inspect final Docker image paths."
+        }
+        $unsafeImageCount = @($imagePaths | Where-Object {
+            $relativePath = $_.Substring($imageRoot.Length).TrimStart("/") -replace '\\', '/'
+            ($relativePath -match $forbiddenName) -or ($relativePath -match $forbiddenRoot)
+        }).Count
+        if ($unsafeImageCount -ne 0) {
+            throw "PC image rejected: $unsafeImageCount disallowed file or directory names."
+        }
     }
 
     Set-Content -LiteralPath (Join-Path $stageDir "runtime-version.txt") -Value $commit -Encoding ascii -NoNewline

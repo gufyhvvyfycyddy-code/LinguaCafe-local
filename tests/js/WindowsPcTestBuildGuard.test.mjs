@@ -102,6 +102,8 @@ assert.match(installer, /Move-Item -LiteralPath \$stageDir -Destination \$releas
 assert.match(installer, /\[System\.IO\.File\]::Replace\(\$tempShortcut, \$shortcutPath, \$shortcutBackup\)/);
 assert.match(installer, /ZipFile\]::OpenRead\(\$runtimeZip\)/);
 assert.match(installer, /unsafeCount -ne 0/);
+assert.match(installer, /docker run --rm --network none --read-only --entrypoint find/);
+assert.match(installer, /unsafeImageCount -ne 0/);
 assert.match(installer, /ExtractToDirectory\(\$runtimeZip, \$sourceDir\)/);
 assert.match(installer, /org\.opencontainers\.image\.revision/);
 assert.match(installer, /COMPOSE_DISABLE_ENV_FILE/);
@@ -120,6 +122,13 @@ if (process.platform === 'win32') {
   const actualSwitch = installer.slice(begin, end);
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'lc-i05-switch-'));
   const quote = (s) => "'" + s.replaceAll("'", "''") + "'";
+  const installerPath = path.join(root, 'scripts', 'windows', 'install-pc-test.ps1');
+  const parseScript = `$tokens=$null; $errors=$null
+[System.Management.Automation.Language.Parser]::ParseFile(${quote(installerPath)}, [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }`;
+  const parseResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', parseScript],
+    { encoding: 'utf8', timeout: 20000, windowsHide: true });
+  assert.equal(parseResult.status, 0, `installer PowerShell syntax: ${parseResult.stderr || parseResult.stdout || parseResult.error}`);
   try {
     // Exercise the stricter installer scanner against a real ZIP: even empty
     // excluded browser directories are unsafe; nested secrets must also fail closed.
