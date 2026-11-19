@@ -75,7 +75,16 @@ assert.match(runtime, /dictionary:import-ecdict/);
 assert.match(runtime, /PC_TEST_ECDICT_CSV/);
 assert.doesNotMatch(runtime, /migrate:fresh|migrate:refresh|migrate:reset|db:wipe/);
 
-assert.equal((windowCode.match(/RuntimeManager\.DataRoot/g) ?? []).length, 2);
+assert.ok((windowCode.match(/RuntimeManager\.DataRoot/g) ?? []).length >= 2);
+const probeStart = windowCode.indexOf('if (isReadOnlyProbe)');
+const probeEnd = windowCode.indexOf('state = runtime.LoadOrCreateState()', probeStart);
+assert.ok(probeStart > 0 && probeEnd > probeStart, 'readonly WPF probe must precede state and Docker work');
+const probe = windowCode.slice(probeStart, probeEnd);
+assert.match(probe, /WebView2-Probe/);
+assert.match(probe, /\/login/);
+assert.match(probe, /WaitForScriptResultAsync/);
+assert.doesNotMatch(probe, /PrepareAsync|LoadOrCreateState|AutoLoginAsync|SaveState/);
+assert.match(windowCode, /--smoke-readonly-ui/);
 assert.doesNotMatch(windowCode, /LocalApplicationData/);
 assert.match(runtime, /DataRoot = Path\.Combine\(@"D:\\AI-Tools", "LinguaCafe", "PC-Test"\)/);
 assert.doesNotMatch(windowCode, /"LinguaCafePCTest"/);

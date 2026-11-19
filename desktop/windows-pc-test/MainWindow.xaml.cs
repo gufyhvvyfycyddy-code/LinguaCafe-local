@@ -8,7 +8,10 @@ namespace LinguaCafe.PcTest;
 public partial class MainWindow : Window
 {
     private readonly RuntimeManager runtime = new();
-    private readonly string startupLogPath = Path.Combine(RuntimeManager.DataRoot, "startup.log");
+    private readonly bool isReadOnlyProbe = Environment.GetCommandLineArgs()
+        .Contains("--smoke-readonly-ui", StringComparer.OrdinalIgnoreCase);
+    private string startupLogPath => Path.Combine(
+        RuntimeManager.DataRoot, isReadOnlyProbe ? "ui-probe.log" : "startup.log");
     private PcTestState state = null!;
 
     public MainWindow()
@@ -21,6 +24,23 @@ public partial class MainWindow : Window
     {
         try
         {
+            if (isReadOnlyProbe)
+            {
+                // Exercise the packaged WPF + WebView2 shell without invoking Docker migrations.
+                Directory.CreateDirectory(RuntimeManager.DataRoot);
+                var probeProfile = Path.Combine(RuntimeManager.DataRoot, "WebView2-Probe");
+                var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: probeProfile);
+                await Browser.EnsureCoreWebView2Async(environment);
+                Browser.Visibility = Visibility.Visible;
+                Browser.CoreWebView2.Navigate($"{RuntimeManager.BaseUrl}/login");
+                await WaitForScriptResultAsync(
+                    "(() => document.querySelector('input[name=\"linguacafe-email\"]') && document.querySelector('input[name=\"linguacafe-password\"]') ? 'ready' : 'pending')()",
+                    "ready", TimeSpan.FromSeconds(30));
+                StartupOverlay.Visibility = Visibility.Collapsed;
+                UpdateStatus("只读界面检查通过：/login（未执行 Docker 启动、数据库迁移或登录）");
+                return;
+            }
+
             state = runtime.LoadOrCreateState();
             File.WriteAllText(startupLogPath, $"{DateTimeOffset.Now:O} START{Environment.NewLine}");
             await runtime.PrepareAsync(UpdateStatus, CancellationToken.None);
