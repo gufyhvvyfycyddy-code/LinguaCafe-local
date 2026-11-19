@@ -136,7 +136,12 @@ try {
     try {
         if (Test-Path -LiteralPath $shortcutPath) {
             $shortcutBackup = Join-Path $installRoot ("shortcut-before-" + $nonce + ".lnk")
-            [System.IO.File]::Replace($tempShortcut, $shortcutPath, $shortcutBackup)
+            # Preserve the old shortcut on D: while Replace uses a temporary backup on C:.
+            [System.IO.File]::Copy($shortcutPath, $shortcutBackup)
+            $localBackup = $shortcutPath + ".before-" + $nonce + ".bak"
+            [System.IO.File]::Replace($tempShortcut, $shortcutPath, $localBackup)
+            try { [System.IO.File]::Delete($localBackup) }
+            catch { Write-Warning "Temporary desktop shortcut backup could not be removed; the D-drive backup is preserved." }
         }
         else {
             [System.IO.File]::Move($tempShortcut, $shortcutPath)
