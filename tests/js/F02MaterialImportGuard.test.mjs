@@ -38,6 +38,45 @@ test('invalid text files remain blocked by the existing source step', () => {
     assert.match(textFileSource, /isImportSourceValid:\s*false/);
 });
 
+test('B-008 a failing optional import integration cannot hide ordinary import types', async () => {
+    const optionalService = fs.readFileSync(
+        new URL('../../app/Services/Settings/SettingValueService.php', import.meta.url), 'utf8',
+    );
+    const source = fs.readFileSync(
+        new URL('../../resources/js/components/Library/Import/ImportTypeSelection.vue', import.meta.url), 'utf8',
+    );
+    assert.match(optionalService, /if \(!\$setting\)\s*\{\s*return false;/);
+    assert.doesNotMatch(optionalService, /Missing jellyfinEnabled setting/);
+    for (const type of ['plain-text', 'text-file', 'e-book']) {
+        assert.match(source, new RegExp("selectImportType\\('" + type + "'\\)"));
+    }
+    const script = source.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    assert.ok(script);
+    const sandbox = { axios: { get: () => Promise.resolve({ data: [] }) } };
+    vm.runInNewContext(script.replace(/^\s*import [^\n]*\r?\n/gm, '')
+        .replace('export default', 'globalThis.component ='), sandbox);
+    const component = sandbox.component;
+
+    sandbox.axios.get = url => url.includes('jellyfin')
+        ? Promise.reject(new Error('optional Jellyfin unavailable'))
+        : Promise.resolve({ data: ['english'] });
+    const first = { ...component.data(), $props: { language: 'english' } };
+    await component.mounted.call(first);
+    assert.equal(first.loading, false);
+    assert.equal(first.websiteImportSupported, true);
+    assert.equal(first.jellyfinEnabled, false);
+    assert.match(first.error, /仍可使用粘贴文本/);
+
+    sandbox.axios.get = url => url.includes('jellyfin')
+        ? Promise.resolve({ data: true })
+        : Promise.reject(new Error('optional website config unavailable'));
+    const second = { ...component.data(), $props: { language: 'english' } };
+    await component.mounted.call(second);
+    assert.equal(second.loading, false);
+    assert.equal(second.websiteImportSupported, false);
+    assert.equal(second.jellyfinEnabled, true);
+});
+
 test('B-009 pasted max-chapter input reaches form submission and invalid values are rejected', () => {
     const importOptions = fs.readFileSync(
         new URL('../../resources/js/components/Library/Import/ImportOptions.vue', import.meta.url), 'utf8',

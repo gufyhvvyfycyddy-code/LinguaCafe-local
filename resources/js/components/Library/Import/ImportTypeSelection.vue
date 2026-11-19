@@ -1,6 +1,6 @@
 <template>
     <div v-if="!loading">
-        <v-alert v-if="error" dense outlined type="error">{{ error }}</v-alert>
+        <v-alert v-if="error" dense outlined type="warning">{{ error }}</v-alert>
         <label class="font-weight-bold">选择导入方式</label>
         <div class="import-type-group flex-wrap">
             <!--Plain text -->
@@ -101,8 +101,6 @@
 </template>
 
 <script>
-    import { requestErrorMessage } from './../../../services/UiTextService';
-
     export default {
         data: function() {
             return {
@@ -118,16 +116,18 @@
         mounted() {
             this.loading = true;
             this.error = '';
-            axios.all([
+            // Optional services fail independently: plain text/file/e-book import stays usable.
+            return Promise.allSettled([
                 axios.get('/config/get/linguacafe.languages.website_import_supported_languages'),
                 axios.get('/settings/is-jellyfin-enabled'),
-            ]).then(axios.spread((response1, response2) => {
-                this.websiteImportSupported = response1.data.includes(this.$props.language);
-                this.jellyfinEnabled = response2.data;
-            })).catch((error) => {
-                this.error = requestErrorMessage(error, '导入方式加载失败。已隐藏需要额外服务的导入方式。');
-                this.websiteImportSupported = false;
-                this.jellyfinEnabled = false;
+            ]).then(([website, jellyfin]) => {
+                this.websiteImportSupported = website.status === 'fulfilled'
+                    && Array.isArray(website.value.data)
+                    && website.value.data.includes(this.$props.language);
+                this.jellyfinEnabled = jellyfin.status === 'fulfilled' && jellyfin.value.data === true;
+                if (website.status === 'rejected' || jellyfin.status === 'rejected') {
+                    this.error = '部分扩展导入方式暂不可用，仍可使用粘贴文本、文本文件或电子书导入。';
+                }
             }).finally(() => {
                 this.loading = false;
             });

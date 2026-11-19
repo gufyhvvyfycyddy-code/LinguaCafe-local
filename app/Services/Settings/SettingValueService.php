@@ -35,11 +35,12 @@ class SettingValueService
             ->where('name', 'jellyfinEnabled')
             ->first();
 
+        // Jellyfin is optional; an unseeded integration must not block ordinary imports.
         if (!$setting) {
-            throw new \Exception('Missing jellyfinEnabled setting. This should never occur.');
+            return false;
         }
 
-        return json_decode($setting->value);
+        return (bool) json_decode($setting->value);
     }
 
     public function getAnkiSettings()
