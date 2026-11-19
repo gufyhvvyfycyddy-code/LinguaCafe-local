@@ -20,6 +20,13 @@ function emptyEcho() {
 }
 
 function createEcho() {
+    // Public auth pages have no user-specific realtime channels.
+    // Login redirects with a full page load, so the authenticated store initializes normally.
+    if (typeof window !== 'undefined' &&
+        ['/login', '/setup', '/register'].includes(window.location.pathname)) {
+        return emptyEcho();
+    }
+
     try {
         const echo = new Echo({
             broadcaster: 'pusher',

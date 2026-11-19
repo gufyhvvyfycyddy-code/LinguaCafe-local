@@ -246,6 +246,12 @@
             }
         },
         mounted() {
+            // Public login/setup/register pages have no authenticated font settings.
+            // Keep the fonts API private: login reloads the app after authentication.
+            if (['/login', '/setup', '/register'].includes(this.$router.currentRoute.path)) {
+                return;
+            }
+
             // load default and selected font types into the dom
             var fontTypeService = new FontTypeService(this.selectedLanguage, () => {
                 fontTypeService.loadSelectedFontTypeIntoDom();

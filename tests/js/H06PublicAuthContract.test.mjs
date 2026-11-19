@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -51,6 +52,49 @@ test('POST /login is guarded by the guest middleware', () => {
 
 test('duplicate Auth RegisteredUserController has been removed', () => {
     assert.equal(fs.existsSync(registeredUserController), false);
+});
+
+test('B-010 public login/setup/register pages do not fetch protected font settings', () => {
+    const source = fs.readFileSync(path.join(root, 'resources/js/components/Layout.vue'), 'utf8');
+    const script = source.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    assert.ok(script, 'Layout Vue script must exist');
+    const sandbox = {
+        FontTypeService: class {
+            constructor() { sandbox.fontRequests++; }
+        },
+        fontRequests: 0,
+    };
+    vm.runInNewContext(
+        script.replace(/^\s*import [^\n]*\r?\n/gm, '').replace('export default', 'globalThis.layout ='),
+        sandbox,
+    );
+    for (const publicPath of ['/login', '/setup', '/register']) {
+        sandbox.layout.mounted.call({ $router: { currentRoute: { path: publicPath } }, selectedLanguage: 'english' });
+    }
+    assert.equal(sandbox.fontRequests, 0, 'public routes must not instantiate the authenticated font service');
+    sandbox.layout.mounted.call({ $router: { currentRoute: { path: '/books' } }, selectedLanguage: 'english' });
+    assert.equal(sandbox.fontRequests, 1, 'authenticated reader still loads fonts');
+    assert.match(webRoutes, /Route::get\('\/fonts\/get-fonts-for-language\/\{language\}'/);
+});
+
+test('O-003 public auth screens do not start realtime sockets; private screens keep existing behavior', () => {
+    const source = fs.readFileSync(path.join(root, 'resources/js/vuex/Shared.js'), 'utf8');
+    const code = source.replace(/^\s*import [^\n]*\r?\n/gm, '')
+        .replace('export default', 'globalThis.shared =');
+    for (const page of ['/login', '/setup', '/register', '/books']) {
+        let connections = 0;
+        class EchoStub {
+            constructor() {
+                connections++;
+                this.connector = { pusher: { connection: { bind() {} } } };
+            }
+        }
+        const sandbox = { window: { location: { pathname: page } }, Pusher: {}, Echo: EchoStub, console };
+        vm.runInNewContext(code, sandbox);
+        const state = sandbox.shared.state();
+        assert.ok(state.echo, 'Vuex state has a safe echo object');
+        assert.equal(connections, page === '/books' ? 1 : 0, page);
+    }
 });
 
 test('login and account-creation fields provide password-manager autocomplete hints', () => {
