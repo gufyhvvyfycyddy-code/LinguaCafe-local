@@ -109,7 +109,10 @@ RUN addgroup --gid 1000 laravel \
     && chown -R laravel /var/www/html
 USER laravel
 
-RUN composer install --optimize-autoloader --no-dev
+# Composer installs Horizon's .npmrc after Docker context filtering; remove it in this layer.
+RUN composer install --optimize-autoloader --no-dev \
+    && rm -f vendor/laravel/horizon/.npmrc \
+    && test -z "$(find vendor -type f -name '.npmrc' -print -quit)"
 
 # Label the exact committed ZIP source, checked before Windows installation.
 ARG PC_TEST_SOURCE_COMMIT=dev
