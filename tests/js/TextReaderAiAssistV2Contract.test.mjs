@@ -155,6 +155,21 @@ test('Reader AI Assist requests V2 source contract, wires strict V2 import, and 
     assert.match(source, /readerAiAssistCandidatesForOccurrence\(this\.sourceMeta, item\.occurrence_id\)/);
 });
 
+test('K02 matched existing AI sense never opens a new WordSense form in either vocabulary layout', () => {
+    const lookup = fs.readFileSync('app/Services/AiReadingAssistService.php', 'utf8');
+    const panel = fs.readFileSync('resources/js/components/Text/AiSuggestionPanel.vue', 'utf8');
+    assert.match(lookup, /'result' => \$vi\['result'\] \?\? null/);
+    assert.match(lookup, /'matched_word_sense_id' => \$vi\['matched_word_sense_id'\] \?\? null/);
+    assert.match(panel, /v-if="vi\.result === 'matched_existing'"/);
+    assert.match(panel, /已匹配已有词义/);
+    assert.match(panel, /v-else[\s\S]{0,280}@click="\$emit\('use-vocab-suggestion', vi\)"/);
+    for (const component of ['VocabularyBox.vue', 'VocabularySideBox.vue']) {
+        const source = fs.readFileSync('resources/js/components/Text/' + component, 'utf8');
+        assert.match(source, /useAiSuggestion\(vi\)\s*\{\s*if \(vi && vi\.result === 'matched_existing'\) return;/);
+        assert.match(source, /openAddFormFromAi\(buildAiVocabSensePayload\(vi\)\)/);
+    }
+});
+
 test('Reader AI V2 source sends the server unfamiliar-target snapshot version and fails closed before freshness is known', () => {
     const source = fs.readFileSync('resources/js/components/TextReader/TextReaderAiAssist.vue', 'utf8');
     assert.match(source, /markedTargetsSnapshotVersion/);

@@ -29,7 +29,11 @@
                     class="ai-text"
                     :title="buildVocabTitle(vi)"
                 >{{ vi.meaning_zh }}</span>
+                <v-chip v-if="vi.result === 'matched_existing'" x-small color="success" outlined>
+                    已匹配已有词义
+                </v-chip>
                 <v-btn
+                    v-else
                     x-small
                     outlined
                     color="primary"

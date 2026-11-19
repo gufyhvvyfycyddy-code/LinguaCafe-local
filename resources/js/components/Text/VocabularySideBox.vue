@@ -488,6 +488,7 @@ export default {
             }
         },
         useAiSuggestion(vi) {
+            if (vi && vi.result === 'matched_existing') return;
             this.showAddSensePanel = true;
             if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
                 this.$refs.wordSensesList.openAddFormFromAi(buildAiVocabSensePayload(vi));

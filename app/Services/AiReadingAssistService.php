@@ -283,6 +283,8 @@ class AiReadingAssistService
                     'source_sentence' => $vi['source_sentence'] ?? '',
                     'reason' => $vi['reason'] ?? '',
                     'confidence' => $vi['confidence'] ?? 'medium',
+                    'result' => $vi['result'] ?? null,
+                    'matched_word_sense_id' => $vi['matched_word_sense_id'] ?? null,
                 ];
             }
         }
