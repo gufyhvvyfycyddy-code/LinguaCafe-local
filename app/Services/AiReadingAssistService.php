@@ -371,9 +371,12 @@ class AiReadingAssistService
                 $record,
             );
             if (($result['assist_stale'] ?? false) === true) {
-                $result['has_saved_assist'] = false;
-                $result['sentence_translations'] = [];
+                // Never expose stale sense suggestions or occurrence bindings.
                 $result['items'] = [];
+                if (($result['sentence_translations_stale'] ?? true) === true) {
+                    $result['has_saved_assist'] = false;
+                    $result['sentence_translations'] = [];
+                }
             }
         } else {
             $result['verification_items'] = [];

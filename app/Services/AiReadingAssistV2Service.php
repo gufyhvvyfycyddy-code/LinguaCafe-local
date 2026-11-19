@@ -170,12 +170,16 @@ class AiReadingAssistV2Service
     ): array {
         $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
         $currentScopeHash = $this->targetScopeHash($catalog['targets']);
-        if (!$record->source_revision
-            || $record->source_revision !== $catalog['source_revision']
-            || !$record->target_scope_hash
-            || !hash_equals($record->target_scope_hash, $currentScopeHash)) {
+        $sourceStale = !$record->source_revision
+            || $record->source_revision !== $catalog['source_revision'];
+        $missingScope = !$record->target_scope_hash;
+        $scopeStale = $missingScope
+            || !hash_equals($record->target_scope_hash, $currentScopeHash);
+        if ($sourceStale || $scopeStale) {
             return [
                 'assist_stale' => true,
+                // Candidate changes invalidate sense bindings, not translations of unchanged text.
+                'sentence_translations_stale' => $sourceStale || $missingScope,
                 'verification_items' => [],
             ];
         }
@@ -218,6 +222,7 @@ class AiReadingAssistV2Service
 
         return [
             'assist_stale' => false,
+            'sentence_translations_stale' => false,
             'verification_items' => $items,
         ];
     }

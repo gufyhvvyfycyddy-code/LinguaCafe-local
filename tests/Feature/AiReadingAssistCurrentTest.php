@@ -236,4 +236,87 @@ class AiReadingAssistCurrentTest extends TestCase
         $this->actingAs($this->user)->getJson('/chapters/ai-assist/current/' . $this->chapter->id)->assertOk();
         $this->assertEquals($originalCount, \App\Models\EncounteredWord::count());
     }
+
+    private function createV2AssistForStalenessTest(string $sourceRevision): void
+    {
+        ChapterAiReadingAssist::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'schema_version' => \App\Services\AiReadingAssistV2Service::SCHEMA_VERSION,
+            'source_revision' => $sourceRevision,
+            'target_scope_hash' => app(\App\Services\AiReadingAssistV2Service::class)->targetScopeHash([]),
+            'sentence_translations' => [
+                ['sentence_index' => 0, 'source_text' => 'This is a test.', 'translation_zh' => '这是一个测试。'],
+            ],
+            'validated_payload' => [
+                'word_results' => [['occurrence_id' => 'obsolete', 'result' => 'matched_existing']],
+                'phrase_results' => [],
+            ],
+            'vocabulary_items' => [['surface' => 'test', 'sentence_index' => 0, 'meaning_zh' => '旧词义']],
+            'phrase_items' => [],
+            'warnings' => [],
+            'summary' => ['sentence_translation_count' => 1],
+        ]);
+    }
+
+    private function mockV2CatalogForStalenessTest(string $revision, array $targets): void
+    {
+        $catalog = \Mockery::mock(\App\Services\ReadingTargetCatalogService::class);
+        $catalog->shouldReceive('build')->andReturn([
+            'source_revision' => $revision,
+            'targets' => $targets,
+        ]);
+        $this->app->instance(\App\Services\ReadingTargetCatalogService::class, $catalog);
+    }
+
+    #[Test]
+    public function v2_target_scope_change_preserves_unchanged_sentence_but_hides_old_sense_data(): void
+    {
+        $revision = 'sha256:same-english-chapter';
+        $this->createV2AssistForStalenessTest($revision);
+        $this->mockV2CatalogForStalenessTest($revision, [
+            ['occurrence_id' => 'new-target', 'purpose' => 'passive_disambiguation', 'candidate_word_senses' => []],
+        ]);
+
+        $this->actingAs($this->user)->getJson('/chapters/ai-assist/current/'.$this->chapter->id)
+            ->assertOk()
+            ->assertJsonPath('has_saved_assist', true)
+            ->assertJsonPath('assist_stale', true)
+            ->assertJsonPath('sentence_translations_stale', false)
+            ->assertJsonPath('sentence_translations.0.translation_zh', '这是一个测试。')
+            ->assertJsonPath('verification_items', [])
+            ->assertJsonPath('items', []);
+
+        $this->actingAs($this->user)->getJson(
+            '/chapters/ai-assist/lookup/'.$this->chapter->id.'?word=test&lemma=test&sentence_index=0'
+        )->assertOk()
+            ->assertJsonPath('assist_stale', true)
+            ->assertJsonPath('vocabulary_suggestions', [])
+            ->assertJsonPath('phrase_suggestions', []);
+
+        $this->assertSame(0, \App\Models\WordSense::count());
+        $this->assertSame(0, \App\Models\ReviewCard::count());
+        $this->assertSame(0, \App\Models\ReviewLog::count());
+    }
+
+    #[Test]
+    public function v2_changed_chapter_source_does_not_reuse_old_sentence_or_sense_data(): void
+    {
+        $this->createV2AssistForStalenessTest('sha256:old-english-chapter');
+        $this->mockV2CatalogForStalenessTest('sha256:edited-english-chapter', []);
+
+        $this->actingAs($this->user)->getJson('/chapters/ai-assist/current/'.$this->chapter->id)
+            ->assertOk()
+            ->assertJsonPath('has_saved_assist', false)
+            ->assertJsonPath('assist_stale', true)
+            ->assertJsonPath('sentence_translations_stale', true)
+            ->assertJsonPath('sentence_translations', [])
+            ->assertJsonPath('verification_items', [])
+            ->assertJsonPath('items', []);
+
+        $this->assertSame(0, \App\Models\WordSense::count());
+        $this->assertSame(0, \App\Models\ReviewCard::count());
+        $this->assertSame(0, \App\Models\ReviewLog::count());
+    }
 }

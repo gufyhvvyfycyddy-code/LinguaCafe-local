@@ -406,6 +406,18 @@ fallback 必须在 `PARAGRAPH_BREAK`、`NEWLINE` 和 section marker 处结束当
 
 只有详细子台账中 RX-001 至 RX-013 全部满足各自退出验收，且正常、失败、超时重试、窗口重建、会话 recovery、Unicode 文本和重复调用矩阵通过后，B-012 才能关闭。
 
+### [Bug][AI辅助阅读][P1] B-013 新增词义后，未变更的中文逐句译文从续读页面消失
+
+**状态：FIXED_AWAITING_RETEST（仅指隔离工作树候选；尚未合并或安装到正式 PC Test，不能关闭）。** 2026-11-20 RUN388在全新独立 MySQL8.4 测试实例 `linguacafe_b013_test`（UUID `cac6bd0d-e442-11f1-99dd-ae978c444ec9`）与真实 Git-backed PHP8.4 环境下完成 B-013 所在 `AiReadingAssistCurrentTest` 14/14、46断言 PASS；关联 lookup 11/11、V2写入边界 11/11、confirm 19/19、sentence alignment 10/10 全部 PASS；TestingDatabaseHealth 6/6 PASS，且测试后原381 FSRS及译文记录计数不变。此前 RUN385 由相同源码 SHA 构建的候选9597，在真实 Chromium 与原9497 A/B 对照中证明“原文未变、候选变化时三句中文常显，且旧词义候选不泄漏”；本轮该候选两份业务文件与受管镜像 SHA256 再次相同，RUN387又在现役旧9497真 GUI 复现失败。以上支持**候选局部修复阶段性验收**，不等于发布版修复。B-013完整退出仍需隔离源码合规提交及独立审查、同审计 SHA 打包升级后PC真实登录→续读→词义/FSRS回归、产品设计者复验；不得据此勾 E06/G07。此 Bug 最初在 2026-11-19 RUN383 被发现；不将合成重复章节另报 Bug。
+
+**用户影响**：用户已导入并保存的三句中文，在同一英文原文上新增一条词义并完成正常FSRS复习后，下一次从首页继续阅读时全部消失。前端显示“暂无已保存 AI 译文”，迫使用户重复导入，破坏“逐句中文常显”基本学习体验。
+
+**实际证据**：仅在新隔离 PC Test 测试库 `linguacafe-study-isolated-381`、自写合成英文书籍与自写译文中，经真实 Chromium 保存三句译文且刷新显示三行 → 点击 careful 创建一个 adjective WordSense/唯一 sense ReviewCard → 官方复习页 Good 一次 → 全新浏览器首页续读。后续 `GET /chapters/ai-assist/current/1` HTTP200 但 `assist_stale=true`、`has_saved_assist=false`、`sentence_translations=[]`；数据库中三句译文未删除、ReviewLog仅一条。通过同一Laravel代码与同一数据库再次独立比较：`source_revision_matches=true`，`target_scope_hash_matches=false`，新的被动匹配目标数由0变1。
+
+**定位**：`ReadingTargetCatalogService::build()`在已确认WordSense出现后加入 `passive_disambiguation`，`AiReadingAssistV2Service::currentVerificationItems()`把章节源变化和目标词义候选变化共同标为过期；`AiReadingAssistService::getCurrentAssist()`因此连原文未变的 `sentence_translations` 一并清空。旧词义候选与例句绑定应保持失效，**只有原文 source_revision 不变时句子译文仍可展示**。
+
+**退出验收**：冻结最小后端响应语义与测试。对原文未变、仅候选变化：新浏览器从首页真实续读仍逐句常显，旧`verification_items/items`及AI候选不再输出、lookup仍fail-closed；对源原文实际变化：旧译文必须隐藏；手动添加词义和普通FSRS Good不额外创建Word/Sense卡或ReviewLog。PHP独立测试及真实隔离GUI均通过后只能标 `FIXED_AWAITING_RETEST`，完整PC版本发布/产品设计者复验后才考虑关闭。不触碰旧PC/个人SP/正式日历/其他数据库。
+
 ---
 
 ## 五、待优化台账
