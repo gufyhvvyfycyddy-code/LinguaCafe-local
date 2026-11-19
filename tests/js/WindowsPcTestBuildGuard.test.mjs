@@ -75,7 +75,9 @@ assert.match(runtime, /dictionary:import-ecdict/);
 assert.match(runtime, /PC_TEST_ECDICT_CSV/);
 assert.doesNotMatch(runtime, /migrate:fresh|migrate:refresh|migrate:reset|db:wipe/);
 
-assert.equal((windowCode.match(/LinguaCafePCTestStudyV4/g) ?? []).length, 2);
+assert.equal((windowCode.match(/RuntimeManager\.DataRoot/g) ?? []).length, 2);
+assert.doesNotMatch(windowCode, /LocalApplicationData/);
+assert.match(runtime, /DataRoot = Path\.Combine\(@"D:\\AI-Tools", "LinguaCafe", "PC-Test"\)/);
 assert.doesNotMatch(windowCode, /"LinguaCafePCTest"/);
 assert.match(windowCode, /\/setup/);
 assert.match(windowCode, /\/login/);
@@ -110,6 +112,9 @@ assert.match(installer, /COMPOSE_DISABLE_ENV_FILE/);
 assert.match(installer, /runtime-version\.txt/);
 assert.match(installer, /LinguaCafe PC Test Study V4\.lnk/);
 assert.match(installer, /LinguaCafePCTestStudyV4/);
+assert.match(installer, /\$installRoot = "D:\\AI-Tools\\LinguaCafe\\PC-Test"/);
+assert.match(installer, /param\(\[switch\]\$StageOnly\)/);
+assert.match(installer, /if \(\$StageOnly\)/);
 assert.match(installer, /docker compose -p linguacafe-pc-test-study-v4/);
 assert.match(installer, /LinguaCafe PC Test\.exe/);
 

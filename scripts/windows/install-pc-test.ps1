@@ -1,3 +1,5 @@
+param([switch]$StageOnly)
+
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -18,8 +20,19 @@ try {
     }
 
     # Separate test lane: old installation and its Docker volumes are never touched.
-    $installRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "LinguaCafePCTestStudyV4"
-    New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+    # Use the private D-drive application root prepared and checked during I06 migration.
+    $installRoot = "D:\AI-Tools\LinguaCafe\PC-Test"
+    if (-not (Test-Path -LiteralPath $installRoot -PathType Container)) {
+        throw "PC Test D-drive root is missing; initialize and verify the private directory before installing."
+    }
+    $rootAcl = Get-Acl -LiteralPath $installRoot
+    if (-not $rootAcl.AreAccessRulesProtected) {
+        throw "PC Test D-drive root has inherited permissions; refusing to place local state here."
+    }
+    $legacyState = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "LinguaCafePCTestStudyV4\state.json"
+    if (-not (Test-Path -LiteralPath (Join-Path $installRoot "state.json")) -and (Test-Path -LiteralPath $legacyState)) {
+        throw "PC Test state remains on C drive; verify and copy its exact contents to the private D-drive root before installing."
+    }
     $releaseDir = Join-Path $installRoot ("app-" + $commit.Substring(0, 12))
     if (Test-Path -LiteralPath $releaseDir) {
         throw "This exact version is already installed; older releases are never overwritten."
@@ -110,6 +123,10 @@ try {
     # Previous app directories remain immutable. Switch only the shortcut.
     Move-Item -LiteralPath $stageDir -Destination $releaseDir
     $stageDir = $null
+    if ($StageOnly) {
+        Write-Host "Staged PC Test revision $commit at $releaseDir. Desktop shortcut remains unchanged pending real GUI validation."
+        return
+    }
     try {
         if (Test-Path -LiteralPath $shortcutPath) {
             $shortcutBackup = Join-Path $installRoot ("shortcut-before-" + $nonce + ".lnk")
