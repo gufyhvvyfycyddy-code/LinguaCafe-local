@@ -44,11 +44,9 @@
                 filled
                 dense
                 rounded
-                min="200"
-                max="20000"
-                type="Number"
-                @keyup="importOptionsChanged"
-                @click="importOptionsChanged"
+                min="300"
+                max="15000"
+                type="number"
                 :rules="[rules.maximumCharactersPerChapter]"
             ></v-text-field>
 
@@ -90,6 +88,12 @@
         mounted() {
             this.importOptionsChanged();
             this.$refs.maximumCharactersPerChapterInput.focus();
+        },
+        watch: {
+            maximumCharactersPerChapter() {
+                // v-model also updates for paste, autofill and IME commits (without keyup).
+                this.$nextTick(() => this.importOptionsChanged());
+            },
         },
         methods: {
             importOptionsChanged() {

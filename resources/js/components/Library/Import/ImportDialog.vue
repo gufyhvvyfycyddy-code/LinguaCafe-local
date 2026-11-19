@@ -123,6 +123,7 @@
                         <!-- Library import settings -->
                         <v-stepper-content step="4">
                             <import-options
+                                ref="importOptions"
                                 v-if="stepperPage > 3"
                                 :language="$props.language"
                                 :type="importType"
@@ -345,6 +346,20 @@
                 }
             },
             finishImport() {
+                // Re-read the active form at submission: paste/autofill may not fire key events.
+                const options = this.$refs.importOptions;
+                if (!options || !options.$refs.importOptionsForm.validate()) {
+                    this.isImportOptionsValid = false;
+                    return;
+                }
+                const maxCharacters = Number(options.maximumCharactersPerChapter);
+                if (!Number.isInteger(maxCharacters) || maxCharacters < 300 || maxCharacters > 15000) {
+                    this.isImportOptionsValid = false;
+                    return;
+                }
+                this.maximumCharactersPerChapter = maxCharacters;
+                this.eBookChapterSortMethod = options.eBookChapterSortMethod;
+
                 var data = new FormData();
                 data.set('importType', this.importType);
                 
