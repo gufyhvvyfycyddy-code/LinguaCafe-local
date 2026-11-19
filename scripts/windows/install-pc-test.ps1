@@ -99,9 +99,15 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "Could not inspect final Docker image paths."
         }
+        # Composer installs two public PHP class files whose names contain "Secret".
+        $publicVendorClasses = @(
+            "vendor/laravel/framework/src/Illuminate/Console/View/Components/Secret.php",
+            "vendor/laravel/serializable-closure/src/Exceptions/MissingSecretKeyException.php"
+        )
         $unsafeImageCount = @($imagePaths | Where-Object {
             $relativePath = $_.Substring($imageRoot.Length).TrimStart("/") -replace '\\', '/'
-            ($relativePath -match $forbiddenName) -or ($relativePath -match $forbiddenRoot)
+            (($relativePath -match $forbiddenName) -or ($relativePath -match $forbiddenRoot)) -and
+                ($relativePath -notin $publicVendorClasses)
         }).Count
         if ($unsafeImageCount -ne 0) {
             throw "PC image rejected: $unsafeImageCount disallowed file or directory names."
