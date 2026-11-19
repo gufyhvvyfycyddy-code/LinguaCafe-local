@@ -36,8 +36,16 @@ assert.doesNotMatch(compose, /C:\/Users\/Administrator|C:\\\\Users\\\\Administra
 assert.match(dockerignore, /^\/desktop$/m);
 assert.match(dockerignore, /^\.env\*$/m);
 assert.match(dockerignore, /^\*\*\/\.env\*$/m);
-assert.match(dockerignore, /^\*\*\/\.playwright-cli\/\*\*$/m);
-assert.match(dockerignore, /^\*\*\/\.opencode\/\*\*$/m);
+for (const directory of [
+  '.secrets', '.playwright-cli', '.codex', '.opencode',
+  '.codebuddy', '.trae', '.claude', '.omo', '.reasonix', '.ssh', '.aws',
+]) {
+  const escaped = directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  assert.match(dockerignore, new RegExp('^\\*\\*/' + escaped + '$', 'm'),
+    'Docker context must omit agent/privacy directory root: ' + directory);
+  assert.match(dockerignore, new RegExp('^\\*\\*/' + escaped + '/\\*\\*$','m'),
+    'Docker context must omit all contents inside: ' + directory);
+}
 const attrs = read('.gitattributes');
 assert.match(attrs, /^\.env\* -diff export-ignore$/m);
 assert.match(attrs, /^\*\*\/\.env\* -diff export-ignore$/m);

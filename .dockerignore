@@ -5,14 +5,25 @@
 **/*.key
 **/*secret*
 **/credentials*
+# Exclude agent/browser directories themselves, not just their children:
+# Docker COPY otherwise preserves empty directory names inside release images.
+**/.secrets
 **/.secrets/**
+**/.playwright-cli
 **/.playwright-cli/**
+**/.codex
 **/.codex/**
+**/.opencode
 **/.opencode/**
+**/.codebuddy
 **/.codebuddy/**
+**/.trae
 **/.trae/**
+**/.claude
 **/.claude/**
+**/.omo
 **/.omo/**
+**/.reasonix
 **/.reasonix/**
 # Keep local credentials and browser traces out even when using a dirty
 # development working tree as a direct Docker context.
@@ -23,7 +34,9 @@
 **/.npmrc
 **/.pypirc
 **/.netrc
+**/.ssh
 **/.ssh/**
+**/.aws
 **/.aws/**
 /data
 /output
