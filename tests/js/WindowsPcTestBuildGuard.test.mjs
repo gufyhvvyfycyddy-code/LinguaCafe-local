@@ -101,7 +101,8 @@ assert.match(installer, /git archive --format=zip --output=\$runtimeZip HEAD/);
 assert.match(installer, /\$env:PC_TEST_RUNTIME_VERSION = \$commit/);
 assert.match(installer, /docker compose[\s\S]*build web python/);
 assert.match(installer, /Move-Item -LiteralPath \$stageDir -Destination \$releaseDir/);
-assert.match(installer, /\[System\.IO\.File\]::Replace\(\$tempShortcut, \$shortcutPath, \$shortcutBackup\)/);
+assert.match(installer, /\[System\.IO\.File\]::Copy\(\$shortcutPath, \$shortcutBackup\)/);
+assert.match(installer, /\[System\.IO\.File\]::Replace\(\$tempShortcut, \$shortcutPath, \$localBackup\)/);
 assert.match(installer, /ZipFile\]::OpenRead\(\$runtimeZip\)/);
 assert.match(installer, /unsafeCount -ne 0/);
 assert.match(installer, /ExtractToDirectory\(\$runtimeZip, \$sourceDir\)/);
@@ -121,6 +122,8 @@ if (process.platform === 'win32') {
   assert.ok(begin > 0 && end > begin, 'release switch block missing');
   const actualSwitch = installer.slice(begin, end);
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'lc-i05-switch-'));
+  const backupTemp = fs.mkdtempSync(path.join(root, '.i05-backup-'));
+  const crossVolume = path.parse(temp).root.toLowerCase() !== path.parse(backupTemp).root.toLowerCase();
   const quote = (s) => "'" + s.replaceAll("'", "''") + "'";
   try {
     // Exercise the stricter installer scanner against a real ZIP: even empty
@@ -157,22 +160,24 @@ ${scanner}
 
     for (const fail of [false, true]) {
       const rootDir = path.join(temp, fail ? 'fail' : 'success');
-      const stageDir = path.join(rootDir, 'staging-test');
-      const releaseDir = path.join(rootDir, 'app-a1b2c3');
+      const backupDir = path.join(backupTemp, fail ? 'fail' : 'success');
+      const stageDir = path.join(backupDir, 'staging-test');
+      const releaseDir = path.join(backupDir, 'app-a1b2c3');
       const shortcut = path.join(rootDir, 'old.lnk');
       const tempShortcut = path.join(rootDir, 'new.lnk');
+      fs.mkdirSync(rootDir, { recursive: true });
       fs.mkdirSync(stageDir, { recursive: true });
       fs.writeFileSync(path.join(stageDir, 'app.exe'), 'new');
       fs.writeFileSync(tempShortcut, 'new-link');
-      if (fail) fs.mkdirSync(shortcut);
-      else fs.writeFileSync(shortcut, 'old-link');
+      fs.writeFileSync(shortcut, 'old-link');
+      if (fail) fs.mkdirSync(shortcut + '.before-test.bak');
       const probeFile = path.join(rootDir, 'switch.ps1');
       fs.writeFileSync(probeFile, `$ErrorActionPreference='Stop'
 $stageDir=${quote(stageDir)}
 $releaseDir=${quote(releaseDir)}
 $shortcutPath=${quote(shortcut)}
 $tempShortcut=${quote(tempShortcut)}
-$installRoot=${quote(rootDir)}
+$installRoot=${quote(backupDir)}
 $nonce='test'
 try {
 ${actualSwitch}
@@ -188,15 +193,15 @@ ${actualSwitch}
       assert.equal(fs.existsSync(releaseDir), !fail);
       assert.equal(fs.existsSync(stageDir), fail);
       assert.equal(fs.existsSync(path.join(fail ? stageDir : releaseDir, 'app.exe')), true);
-      if (fail) assert.equal(fs.statSync(shortcut).isDirectory(), true);
-      else {
-        assert.equal(fs.readFileSync(shortcut, 'utf8'), 'new-link');
-        assert.equal(fs.readFileSync(path.join(rootDir, 'shortcut-before-test.lnk'), 'utf8'), 'old-link');
-      }
+      assert.equal(fs.readFileSync(shortcut, 'utf8'), fail ? 'old-link' : 'new-link');
+      assert.equal(fs.readFileSync(path.join(backupDir, 'shortcut-before-test.lnk'), 'utf8'), 'old-link');
+      assert.equal(fs.existsSync(shortcut + '.before-test.bak'), fail);
     }
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
+    fs.rmSync(backupTemp, { recursive: true, force: true });
   }
+  if (crossVolume) console.log('PC shortcut switch C/D cross-volume verified.');
 }
 
 assert.match(goal, /## Phase I — Windows PC 测试版 \+ 产品设计者持续反馈/);
