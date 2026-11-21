@@ -118,17 +118,21 @@
         mounted() {
             this.loading = true;
             this.error = '';
-            axios.all([
-                axios.get('/config/get/linguacafe.languages.website_import_supported_languages'),
-                axios.get('/settings/is-jellyfin-enabled'),
-            ]).then(axios.spread((response1, response2) => {
-                this.websiteImportSupported = response1.data.includes(this.$props.language);
-                this.jellyfinEnabled = response2.data;
-            })).catch((error) => {
-                this.error = requestErrorMessage(error, '导入方式加载失败。已隐藏需要额外服务的导入方式。');
-                this.websiteImportSupported = false;
-                this.jellyfinEnabled = false;
-            }).finally(() => {
+            // Optional integrations fail independently: Jellyfin must not hide website import.
+            const websiteRequest = axios.get('/config/get/linguacafe.languages.website_import_supported_languages')
+                .then(response => {
+                    this.websiteImportSupported = response.data.includes(this.$props.language);
+                }).catch(error => {
+                    this.websiteImportSupported = false;
+                    this.error = requestErrorMessage(error, '无法确认网页导入是否可用。其他导入方式不受影响。');
+                });
+            const jellyfinRequest = axios.get('/settings/is-jellyfin-enabled')
+                .then(response => {
+                    this.jellyfinEnabled = response.data;
+                }).catch(() => {
+                    this.jellyfinEnabled = false;
+                });
+            Promise.all([websiteRequest, jellyfinRequest]).finally(() => {
                 this.loading = false;
             });
         },

@@ -50,4 +50,32 @@ assert.ok(
 );
 assert.match(ankiCall, /error\?\.response\?\.data\?\.error\?\.message/);
 
+// Execute the real import-selector mounted handler with simulated optional requests.
+const importSelection = read('resources/js/components/Library/Import/ImportTypeSelection.vue');
+const script = importSelection.match(/<script>([\s\S]*?)<\/script>/)?.[1]
+    .replace(/^\s*import .*;\s*$/m, '')
+    .replace('export default', 'return');
+assert.ok(script, 'import selector script must be readable');
+
+async function importFlags(jellyfinFails) {
+    const axios = {
+        get: url => url.includes('is-jellyfin-enabled')
+            ? (jellyfinFails ? Promise.reject(new Error('synthetic optional failure')) : Promise.resolve({ data: false }))
+            : Promise.resolve({ data: ['english'] }),
+    };
+    const component = new Function('axios', 'requestErrorMessage', script)(axios, () => 'feature unavailable');
+    const state = { ...component.data(), $props: { language: 'english' } };
+    component.mounted.call(state);
+    await new Promise(resolve => setImmediate(resolve));
+    return state;
+}
+const healthy = await importFlags(false);
+const failedOptional = await importFlags(true);
+for (const state of [healthy, failedOptional]) {
+    assert.equal(state.loading, false);
+    assert.equal(state.websiteImportSupported, true, 'unrelated website import must remain available');
+    assert.equal(state.jellyfinEnabled, false);
+    assert.equal(state.error, '', 'optional Jellyfin failure must not show an error for basic imports');
+}
+
 console.log('Optional integration fail-soft contract passed.');
