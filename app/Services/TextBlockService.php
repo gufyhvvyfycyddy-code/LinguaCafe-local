@@ -190,7 +190,7 @@ class TextBlockService
     {
         $fragments = [];
         $masked = preg_replace_callback(
-            '~(?<![\pL\pN])(?:https?://|www\.)[^\s<>"\']+|(?<![\pL\pN._%+-])[\pL\pN._%+-]+@[\pL\pN.-]+\.[A-Za-z]{2,}~iu',
+            '~(?<![\pL\pN])(?:https?://|www\.)[^\s<>"\']+|(?<![\pL\pN@._-])(?:[\pL\pN-]+\.)+(?-i:[a-z]{2,})(?:[/?#][^\s<>"\']*)?|(?<![\pL\pN._%+-])[\pL\pN._%+-]+@[\pL\pN.-]+\.[A-Za-z]{2,}~iu',
             function ($match) use ($text, &$fragments) {
                 $value = rtrim($match[0], '.,;:!?');
                 while (preg_match('/[)\]}]$/', $value)) {

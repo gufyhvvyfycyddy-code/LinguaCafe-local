@@ -168,6 +168,23 @@ class EnglishFallbackTokenizerServiceTest extends TestCase
             'ZZLCMETABZZ and editor@example.org.'
         );
         $this->assertArrayNotHasKey('ZZLCMETABZZ', $collisionSources);
+
+        // Scholarly citations often omit https://; the domain must still stay atomic.
+        [$bare, $bareSources] = $reflection->getMethod('protectSourceFragments')->invoke(
+            $service,
+            'See plato.stanford.edu/entries/technicity today.'
+        );
+        $this->assertSame(['plato.stanford.edu/entries/technicity'], array_values($bareSources));
+        $bareTokens = $this->service()->tokenize($bare, fn (): bool => false, fn (string $w): bool => false);
+        $bareRestored = $reflection->getMethod('mapStructuralTokens')->invoke($service, $bareTokens, $bareSources);
+        $this->assertSame(['See', 'plato.stanford.edu/entries/technicity', 'today', '.'],
+            array_map(fn (\stdClass $token): string => $token->w, $bareRestored));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip($bareRestored[1]->w));
+        [, $names] = $reflection->getMethod('protectSourceFragments')->invoke(
+            $service,
+            'Mr.Smith and Dr.Jones cite C.S.Lewis.'
+        );
+        $this->assertSame([], $names, 'Personal names are not bare domains');
     }
 
     private function service(): EnglishFallbackTokenizerService
