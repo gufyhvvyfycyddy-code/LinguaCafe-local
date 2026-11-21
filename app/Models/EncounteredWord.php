@@ -54,17 +54,10 @@ class EncounteredWord extends Model
 
         // Restoring a non-review stage must not seed unrelated global settings.
         if ($stage < 0) {
-            $reviewIntervals = Setting::where('name', 'reviewIntervals')->first();
-
-            if (!$reviewIntervals) {
-                // Auto-recover: seed missing settings
-                \Log::warning('EncounteredWord::setStage: reviewIntervals setting missing, auto-seeding defaults.');
-                $seeder = new \Database\Seeders\SettingsSeeder();
-                $seeder->run();
-                $reviewIntervals = Setting::where('name', 'reviewIntervals')->first();
-            }
-
-            $reviewIntervals = json_decode($reviewIntervals->value ?? '{}');
+            $setting = Setting::where('name', 'reviewIntervals')->first();
+            $reviewIntervals = $setting
+                ? json_decode($setting->value)
+                : (object) Setting::DEFAULT_REVIEW_INTERVALS;
             $stageString = strval($stage);
             $possibleDates = $reviewIntervals->$stageString;
             $nextReviewIndex = 0;

@@ -115,15 +115,7 @@ class SettingsSeeder extends Seeder
         if (!$setting) {
             DB::table('settings')->insert([
                 'name' => 'reviewIntervals',
-                'value' => json_encode([
-                    "-7" => [0],
-                    "-6" => [1],
-                    "-5" => [2, 3],
-                    "-4" => [6, 7, 8],
-                    "-3" => [15, 16, 17, 18],
-                    "-2" => [37, 38, 39, 40, 41, 42],
-                    "-1" => [94, 95, 96, 97, 98, 99, 100, 101],
-                ])
+                'value' => json_encode(Setting::DEFAULT_REVIEW_INTERVALS)
             ]);
         }
     }

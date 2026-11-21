@@ -41,8 +41,10 @@ class Phrase extends Model
 
         // Only scheduled legacy stages need a review interval setting.
         if ($stage < 0) {
-            $reviewIntervals = Setting::where('name', 'reviewIntervals')->first();
-            $reviewIntervals = json_decode($reviewIntervals->value);
+            $setting = Setting::where('name', 'reviewIntervals')->first();
+            $reviewIntervals = $setting
+                ? json_decode($setting->value)
+                : (object) Setting::DEFAULT_REVIEW_INTERVALS;
             $stageString = strval($stage);
             $possibleDates = $reviewIntervals->$stageString;
             $nextReviewIndex = 0;
