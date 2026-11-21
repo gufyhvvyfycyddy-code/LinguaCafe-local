@@ -38,11 +38,11 @@ class Phrase extends Model
         }
         
         $this->stage = $stage;
-        $reviewIntervals = Setting::where('name', 'reviewIntervals')->first();
-        $reviewIntervals = json_decode($reviewIntervals->value);
 
-        // find the most optimal day for the next review
+        // Only scheduled legacy stages need a review interval setting.
         if ($stage < 0) {
+            $reviewIntervals = Setting::where('name', 'reviewIntervals')->first();
+            $reviewIntervals = json_decode($reviewIntervals->value);
             $stageString = strval($stage);
             $possibleDates = $reviewIntervals->$stageString;
             $nextReviewIndex = 0;
