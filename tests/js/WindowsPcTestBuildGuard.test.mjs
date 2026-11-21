@@ -168,8 +168,20 @@ ${scanner}
       fs.mkdirSync(rootDir, { recursive: true });
       fs.mkdirSync(stageDir, { recursive: true });
       fs.writeFileSync(path.join(stageDir, 'app.exe'), 'new');
-      fs.writeFileSync(tempShortcut, 'new-link');
-      fs.writeFileSync(shortcut, 'old-link');
+      const createLinks = `$ErrorActionPreference='Stop'
+$shell=New-Object -ComObject WScript.Shell
+$old=$shell.CreateShortcut(${quote(shortcut)})
+$old.TargetPath=Join-Path $env:SystemRoot 'System32\\notepad.exe'
+$old.Save()
+$new=$shell.CreateShortcut(${quote(tempShortcut)})
+$new.TargetPath=Join-Path $env:SystemRoot 'System32\\cmd.exe'
+$new.Save()`;
+      const createResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', createLinks],
+        { encoding: 'utf8', timeout: 20000, windowsHide: true });
+      assert.equal(createResult.status, 0, 'Could not create real Windows shortcut fixtures');
+      const oldBytes = fs.readFileSync(shortcut);
+      const newBytes = fs.readFileSync(tempShortcut);
+      assert.notDeepEqual(oldBytes, newBytes);
       if (fail) fs.mkdirSync(shortcut + '.before-test.bak');
       const probeFile = path.join(rootDir, 'switch.ps1');
       fs.writeFileSync(probeFile, `$ErrorActionPreference='Stop'
@@ -193,8 +205,8 @@ ${actualSwitch}
       assert.equal(fs.existsSync(releaseDir), !fail);
       assert.equal(fs.existsSync(stageDir), fail);
       assert.equal(fs.existsSync(path.join(fail ? stageDir : releaseDir, 'app.exe')), true);
-      assert.equal(fs.readFileSync(shortcut, 'utf8'), fail ? 'old-link' : 'new-link');
-      assert.equal(fs.readFileSync(path.join(backupDir, 'shortcut-before-test.lnk'), 'utf8'), 'old-link');
+      assert.deepEqual(fs.readFileSync(shortcut), fail ? oldBytes : newBytes);
+      assert.deepEqual(fs.readFileSync(path.join(backupDir, 'shortcut-before-test.lnk')), oldBytes);
       assert.equal(fs.existsSync(shortcut + '.before-test.bak'), fail);
     }
   } finally {
