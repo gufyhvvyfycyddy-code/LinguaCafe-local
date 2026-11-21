@@ -126,6 +126,50 @@ class EnglishFallbackTokenizerServiceTest extends TestCase
         $this->assertStringContainsString('return $this->englishFallbackTokenizer->irregularLemma($word);', $source);
     }
 
+    public function test_source_links_and_emails_are_restored_as_single_non_vocabulary_tokens(): void
+    {
+        $service = (new \ReflectionClass(\App\Services\TextBlockService::class))
+            ->newInstanceWithoutConstructor();
+        $reflection = new \ReflectionClass($service);
+        [$masked, $fragments] = $reflection->getMethod('protectSourceFragments')->invoke(
+            $service,
+            'Read https://plato.stanford.edu/entries/technicity. Contact editor@example.org.'
+        );
+        $this->assertCount(2, $fragments);
+        $this->assertStringNotContainsString('plato.stanford', $masked);
+
+        $tokens = $this->service()->tokenize($masked, fn (): bool => false, fn (string $w): bool => false);
+        $restored = $reflection->getMethod('mapStructuralTokens')->invoke($service, $tokens, $fragments);
+        $words = array_map(fn (\stdClass $token): string => $token->w, $restored);
+        $this->assertSame([
+            'Read', 'https://plato.stanford.edu/entries/technicity', '.',
+            'Contact', 'editor@example.org', '.',
+        ], $words);
+        $this->assertSame([0, 0, 0, 2, 2, 2], array_map(fn (\stdClass $token): int => $token->si, $restored));
+        $this->assertSame('PUNCT', $restored[1]->pos);
+        $this->assertSame('PUNCT', $restored[4]->pos);
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip($restored[1]->w));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip($restored[4]->w));
+        $processed = array_map(fn (\stdClass $token): \stdClass => (object) [
+            'word' => $token->w,
+        ], $restored);
+        $this->assertSame(['read', 'contact'],
+            (new \App\Services\ReaderDataService(1, 'english'))->collectUniqueWords($processed));
+
+        [$bracketed, $bracketedSources] = $reflection->getMethod('protectSourceFragments')->invoke(
+            $service,
+            '(https://en.wikipedia.org/wiki/Function_(mathematics)).'
+        );
+        $this->assertSame(['https://en.wikipedia.org/wiki/Function_(mathematics)'], array_values($bracketedSources));
+        $this->assertStringEndsWith(').', $bracketed);
+
+        [, $collisionSources] = $reflection->getMethod('protectSourceFragments')->invoke(
+            $service,
+            'ZZLCMETABZZ and editor@example.org.'
+        );
+        $this->assertArrayNotHasKey('ZZLCMETABZZ', $collisionSources);
+    }
+
     private function service(): EnglishFallbackTokenizerService
     {
         return new EnglishFallbackTokenizerService();

@@ -153,6 +153,12 @@ class TextBlockService
         // 合并连续段落标记
         $text = preg_replace('/(' . self::MARKER_PARA . '\s+)+/', self::MARKER_PARA . ' ', $text);
 
+        // Keep source URLs and email addresses as one non-vocabulary token in either tokenizer.
+        $sourceFragments = [];
+        if ($this->language === 'english') {
+            [$text, $sourceFragments] = $this->protectSourceFragments($text);
+        }
+
         // 3. Tokenize
         try {
             $tokens = $this->postTokenizer('/tokenizer', [
@@ -173,20 +179,59 @@ class TextBlockService
         }
 
         // 4. 后处理：将安全标记替换为结构 token（不再依赖前端字符串匹配）
-        $this->tokenizedWords = $this->mapStructuralTokens($tokens);
+        $this->tokenizedWords = $this->mapStructuralTokens($tokens, $sourceFragments);
+    }
+
+    /**
+     * Replace links before tokenization so their domain/path pieces never become words.
+     * @return array{string, array<string, string>}
+     */
+    private function protectSourceFragments(string $text): array
+    {
+        $fragments = [];
+        $masked = preg_replace_callback(
+            '~(?<![\pL\pN])(?:https?://|www\.)[^\s<>"\']+|(?<![\pL\pN._%+-])[\pL\pN._%+-]+@[\pL\pN.-]+\.[A-Za-z]{2,}~iu',
+            function ($match) use ($text, &$fragments) {
+                $value = rtrim($match[0], '.,;:!?');
+                while (preg_match('/[)\]}]$/', $value)) {
+                    $last = substr($value, -1);
+                    $open = [')' => '(', ']' => '[', '}' => '{'][$last];
+                    if (substr_count($value, $last) <= substr_count($value, $open)) {
+                        break;
+                    }
+                    $value = substr($value, 0, -1);
+                }
+                $suffix = substr($match[0], strlen($value));
+                $index = count($fragments) + 1;
+                do {
+                    $marker = 'ZZLCMETA' . strtr((string) $index++, '0123456789', 'ABCDEFGHIJ') . 'ZZ';
+                } while (str_contains($text, $marker) || isset($fragments[$marker]));
+                $fragments[$marker] = $value;
+                return ' ' . $marker . ' ' . $suffix;
+            },
+            $text
+        );
+
+        return [$masked, $fragments];
     }
 
     /**
      * 将 tokenizer 返回的安全标记 ZZPARAZZ / ZZNEWLZZ / ZZSECTxZ
      * 替换为显式结构 token（pos = 'STRUCT'），前端/过滤层据此识别。
      */
-    private function mapStructuralTokens(array $tokens): array
+    private function mapStructuralTokens(array $tokens, array $sourceFragments = []): array
     {
         $result = [];
         foreach ($tokens as $token) {
             $w = $token->w ?? '';
 
-            if ($w === self::MARKER_PARA) {
+            if (isset($sourceFragments[$w])) {
+                $st = clone $token;
+                $st->w = $sourceFragments[$w];
+                $st->l = $st->w;
+                $st->pos = 'PUNCT';
+                $result[] = $st;
+            } elseif ($w === self::MARKER_PARA) {
                 $st = clone $token;
                 $st->w = 'PARAGRAPH_BREAK';
                 $st->l = 'PARAGRAPH_BREAK';
