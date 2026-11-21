@@ -59,6 +59,7 @@ const phpDockerfile = read('docker/PhpDockerfile');
 assert.match(phpDockerfile, /CARGO_NET_GIT_FETCH_WITH_CLI=true cargo build --release --locked/);
 assert.match(phpDockerfile, /--mount=type=cache,id=linguacafe-pc-test-cargo-git/);
 assert.match(phpDockerfile, /cp target\/release\/libfsrs_rs_php\.so libfsrs_rs_php\.so/);
+assert.match(phpDockerfile, /RUN composer install --optimize-autoloader --no-dev \\\s*&& rm -f vendor\/laravel\/horizon\/\.npmrc/);
 assert.match(compose, /PC_TEST_SOURCE_COMMIT: \$\{PC_TEST_RUNTIME_VERSION:-dev\}/);
 assert.match(gitignore, /^\/desktop\/windows-pc-test\/bin\/$/m);
 assert.match(gitignore, /^\/desktop\/windows-pc-test\/obj\/$/m);
@@ -113,6 +114,11 @@ assert.match(installer, /ZipFile\]::OpenRead\(\$runtimeZip\)/);
 assert.match(installer, /unsafeCount -ne 0/);
 assert.match(installer, /ExtractToDirectory\(\$runtimeZip, \$sourceDir\)/);
 assert.match(installer, /org\.opencontainers\.image\.revision/);
+assert.match(installer, /docker run --rm --network none --read-only --entrypoint find/);
+assert.match(installer, /unsafeImageCount -ne 0/);
+assert.match(installer, /\$relativePath -notin \$publicVendorClasses/);
+assert.match(installer, /vendor\/laravel\/framework\/src\/Illuminate\/Console\/View\/Components\/Secret\.php/);
+assert.match(installer, /vendor\/laravel\/serializable-closure\/src\/Exceptions\/MissingSecretKeyException\.php/);
 assert.match(installer, /COMPOSE_DISABLE_ENV_FILE/);
 assert.match(installer, /runtime-version\.txt/);
 assert.match(installer, /LinguaCafe PC Test Study V4\.lnk/);
@@ -163,6 +169,38 @@ ${scanner}
     const scanResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', scanFile],
       { encoding: 'utf8', timeout: 20000, windowsHide: true });
     assert.equal(scanResult.status, 0, `archive scan: ${scanResult.stderr || scanResult.stdout || scanResult.error}`);
+
+    // Exercise the production final-image filename filter without requiring Docker in CI.
+    const imageScanStart = installer.indexOf('        $publicVendorClasses = @(');
+    const imageScanEnd = installer.indexOf('        if ($unsafeImageCount -ne 0)', imageScanStart);
+    assert.ok(imageScanStart >= 0 && imageScanEnd > imageScanStart, 'final image filename scanner missing');
+    const imageScanner = installer.slice(imageScanStart, imageScanEnd);
+    const forbiddenAssignments = installer.split(/\r?\n/).filter(line =>
+      line.includes('$forbiddenName = ') || line.includes('$forbiddenRoot = ')).join('\n');
+    const imageProbe = path.join(temp, 'image-scan.ps1');
+    fs.writeFileSync(imageProbe, `$ErrorActionPreference='Stop'
+${forbiddenAssignments}
+$imageRoot='/var/www/html'
+$imagePaths=@('/var/www/html/README.md',
+ '/var/www/html/vendor/laravel/framework/src/Illuminate/Console/View/Components/Secret.php',
+ '/var/www/html/private/.envrc', '/var/www/html/private/.playwright-cli/page.yml',
+ '/var/www/html/vendor/laravel/horizon/.npmrc')
+${imageScanner}
+if ($unsafeImageCount -ne 3) { throw 'Final-image checker failed to reject private files or vendor npm config' }
+$imagePaths=@('/var/www/html/README.md',
+ '/var/www/html/vendor/laravel/framework/src/Illuminate/Console/View/Components/Secret.php',
+ '/var/www/html/vendor/laravel/serializable-closure/src/Exceptions/MissingSecretKeyException.php')
+${imageScanner}
+if ($unsafeImageCount -ne 0) { throw 'Final-image checker rejected public framework files' }
+$imageRoot='/app'
+$imagePaths=@('/app/main.py', '/app/private/.aws/credentials', '/app/private/key.pem')
+${imageScanner}
+if ($unsafeImageCount -ne 2) { throw 'Python image checker missed private files' }
+`, 'utf8');
+    const imageProbeResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', imageProbe],
+      { encoding: 'utf8', timeout: 20000, windowsHide: true });
+    assert.equal(imageProbeResult.status, 0,
+      `final-image filename filter: ${imageProbeResult.stderr || imageProbeResult.stdout || imageProbeResult.error}`);
 
     for (const fail of [false, true]) {
       const rootDir = path.join(temp, fail ? 'fail' : 'success');

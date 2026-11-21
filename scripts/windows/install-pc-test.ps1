@@ -93,6 +93,26 @@ try {
         if ($revision -ne $commit) {
             throw "Docker image source revision does not match archived commit."
         }
+
+        # Dependencies can add files after the archived source has passed its filename scan.
+        $imageRoot = if ($image -like "linguacafe-pc-test-web:*") { "/var/www/html" } else { "/app" }
+        $imagePaths = @(docker run --rm --network none --read-only --entrypoint find $image $imageRoot -print)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not inspect final Docker image paths."
+        }
+        # These two public framework classes contain "Secret" in their names.
+        $publicVendorClasses = @(
+            "vendor/laravel/framework/src/Illuminate/Console/View/Components/Secret.php",
+            "vendor/laravel/serializable-closure/src/Exceptions/MissingSecretKeyException.php"
+        )
+        $unsafeImageCount = @($imagePaths | Where-Object {
+            $relativePath = $_.Substring($imageRoot.Length).TrimStart("/") -replace '\\', '/'
+            (($relativePath -match $forbiddenName) -or ($relativePath -match $forbiddenRoot)) -and
+                ($relativePath -notin $publicVendorClasses)
+        }).Count
+        if ($unsafeImageCount -ne 0) {
+            throw "PC image rejected: $unsafeImageCount disallowed file or directory names."
+        }
     }
 
     Set-Content -LiteralPath (Join-Path $stageDir "runtime-version.txt") -Value $commit -Encoding ascii -NoNewline
