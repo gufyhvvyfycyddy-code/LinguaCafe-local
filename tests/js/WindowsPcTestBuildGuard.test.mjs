@@ -75,7 +75,9 @@ assert.match(runtime, /dictionary:import-ecdict/);
 assert.match(runtime, /PC_TEST_ECDICT_CSV/);
 assert.doesNotMatch(runtime, /migrate:fresh|migrate:refresh|migrate:reset|db:wipe/);
 
-assert.equal((windowCode.match(/LinguaCafePCTestStudyV4/g) ?? []).length, 2);
+assert.match(runtime, /DataRoot = Path\.Combine\(@"D:\\AI-Tools", "LinguaCafe", "PC-Test"\)/);
+assert.match(windowCode, /Path\.Combine\(RuntimeManager\.DataRoot, "startup\.log"\)/);
+assert.match(windowCode, /Path\.Combine\(RuntimeManager\.DataRoot, "WebView2"\)/);
 assert.doesNotMatch(windowCode, /"LinguaCafePCTest"/);
 assert.match(windowCode, /\/setup/);
 assert.match(windowCode, /\/login/);
