@@ -69,7 +69,7 @@ typer==0.27.2
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 Unidecode==1.4.0
-urllib3==2.7.0
+urllib3==2.8.0
 wasabi==1.1.3
 weasel==1.0.0
 wrapt==2.3.0
