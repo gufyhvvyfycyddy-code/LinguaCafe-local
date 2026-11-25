@@ -472,6 +472,83 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame(100, $response->json('pagination.per_page'));
     }
 
+    public function test_over_limit_page_size_is_bounded_and_scope_preserved(): void
+    {
+        $ownedCardIds = [];
+        foreach (range(1, 101) as $number) {
+            $sense = $this->createSense($this->user->id, 'english', [
+                'lemma' => 'pagination-large-' . $number,
+            ]);
+            $ownedCardIds[] = $this->createSenseCard($sense)->id;
+        }
+        $otherSense = $this->createSense($this->otherUser->id, 'english', [
+            'lemma' => 'pagination-other-user',
+        ]);
+        $otherCard = $this->createSenseCard($otherSense);
+        $spanishSense = $this->createSense($this->user->id, 'spanish', [
+            'lemma' => 'pagination-other-language',
+        ]);
+        $spanishCard = $this->createSenseCard($spanishSense);
+
+        $first = $this->actingAs($this->user)
+            ->get('/review-cards/manage/data?filter=all&per_page=200&page=1');
+        $first->assertOk();
+        $this->assertSame(100, $first->json('pagination.per_page'));
+        $this->assertSame(101, $first->json('pagination.total'));
+        $this->assertSame(2, $first->json('pagination.last_page'));
+        $this->assertCount(100, $first->json('items'));
+        $firstIds = array_column($first->json('items'), 'review_card_id');
+        foreach ($firstIds as $cardId) {
+            $this->assertContains($cardId, $ownedCardIds);
+        }
+        $this->assertNotContains($otherCard->id, $firstIds);
+        $this->assertNotContains($spanishCard->id, $firstIds);
+
+        $second = $this->actingAs($this->user)
+            ->get('/review-cards/manage/data?filter=all&per_page=200&page=2');
+        $second->assertOk();
+        $this->assertSame(2, $second->json('pagination.current_page'));
+        $this->assertCount(1, $second->json('items'));
+        $secondId = $second->json('items.0.review_card_id');
+        $this->assertContains($secondId, $ownedCardIds);
+        $this->assertNotContains($secondId, $firstIds);
+
+        foreach (['-1', '0'] as $perPage) {
+            $bounded = $this->actingAs($this->user)
+                ->get('/review-cards/manage/data?filter=all&per_page=' . $perPage);
+            $bounded->assertOk();
+            $this->assertSame(1, $bounded->json('pagination.per_page'));
+            $this->assertSame(101, $bounded->json('pagination.total'));
+            $this->assertCount(1, $bounded->json('items'));
+        }
+    }
+
+    public function test_nonpositive_per_page_cannot_disable_pagination_limit(): void
+    {
+        foreach (range(1, 4) as $number) {
+            $sense = $this->createSense($this->user->id, 'english', [
+                'lemma' => 'pagination-case-' . $number,
+            ]);
+            $this->createSenseCard($sense);
+        }
+
+        foreach (['-1', '0', '-25'] as $perPage) {
+            $response = $this->actingAs($this->user)
+                ->get('/review-cards/manage/data?filter=all&per_page=' . $perPage);
+            $response->assertOk();
+            $this->assertSame(1, $response->json('pagination.per_page'));
+            $this->assertSame(4, $response->json('pagination.total'));
+            $this->assertCount(1, $response->json('items'));
+            $this->assertSame(4, $response->json('pagination.last_page'));
+        }
+
+        $secondPage = $this->actingAs($this->user)
+            ->get('/review-cards/manage/data?filter=all&per_page=-1&page=2');
+        $secondPage->assertOk();
+        $this->assertSame(2, $secondPage->json('pagination.current_page'));
+        $this->assertCount(1, $secondPage->json('items'));
+    }
+
     public function test_response_structure_has_items_and_pagination(): void
     {
         $sense = $this->createSense($this->user->id, 'english');

@@ -46,7 +46,8 @@ class ReviewCardManageController extends Controller
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
-        $perPage = min((int) $request->input('per_page', 20), 100);
+        // F01: A negative page size can bypass the SQL LIMIT in Laravel.
+        $perPage = max(1, min((int) $request->input('per_page', 20), 100));
         $filter = $request->input('filter', 'enabled');
         $includeLeech = $request->boolean('include_leech') || in_array($filter, ['leech', 'struggling'], true);
 
