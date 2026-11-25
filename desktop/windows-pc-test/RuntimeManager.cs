@@ -3,7 +3,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace LinguaCafe.PcTest;
 
@@ -11,10 +10,20 @@ public sealed class RuntimeManager
 {
     public const string BaseUrl = "http://127.0.0.1:9396";
 
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private string runtimeImageTag = "dev";
     internal static readonly string DataRoot = Path.Combine(@"D:\AI-Tools", "LinguaCafe", "PC-Test");
-    private readonly string appDataRoot = DataRoot;
+    private readonly string appDataRoot;
+    private readonly string legacyStatePath;
+
+    public RuntimeManager() : this(DataRoot, LegacyStatePath) { }
+
+    // Inject only generated test paths. The normal desktop constructor keeps
+    // the original private D-drive and C-drive legacy identity boundaries.
+    internal RuntimeManager(string appDataRoot, string legacyStatePath)
+    {
+        this.appDataRoot = appDataRoot;
+        this.legacyStatePath = legacyStatePath;
+    }
     private static readonly string LegacyStatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "LinguaCafePCTestStudyV4", "state.json");
@@ -26,11 +35,10 @@ public sealed class RuntimeManager
         Directory.CreateDirectory(appDataRoot);
         if (File.Exists(StatePath))
         {
-            return JsonSerializer.Deserialize<PcTestState>(File.ReadAllText(StatePath), JsonOptions)
-                ?? throw new InvalidOperationException("PC test state is invalid.");
+            return PcTestStatePersistence.Load(StatePath);
         }
 
-        if (File.Exists(LegacyStatePath))
+        if (File.Exists(legacyStatePath))
         {
             throw new InvalidOperationException(
                 "Existing PC test identity is still on C drive. Verify and copy its state.json to the D-drive PC Test folder before starting.");
@@ -47,7 +55,7 @@ public sealed class RuntimeManager
     public void SaveState(PcTestState state)
     {
         Directory.CreateDirectory(appDataRoot);
-        File.WriteAllText(StatePath, JsonSerializer.Serialize(state, JsonOptions));
+        PcTestStatePersistence.Save(StatePath, state);
     }
 
     public async Task<string> PrepareAsync(Action<string> report, CancellationToken cancellationToken)

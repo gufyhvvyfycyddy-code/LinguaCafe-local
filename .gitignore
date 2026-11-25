@@ -75,3 +75,6 @@ yarn-error.log
 # Windows PC test build outputs
 /desktop/windows-pc-test/bin/
 /desktop/windows-pc-test/obj/
+# Synthetic Windows credential-state test build outputs
+/tests/bin/
+/tests/obj/

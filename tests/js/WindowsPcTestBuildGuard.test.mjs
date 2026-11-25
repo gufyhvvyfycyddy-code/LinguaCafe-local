@@ -10,6 +10,8 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
 const project = read('desktop', 'windows-pc-test', 'LinguaCafe.PcTest.csproj');
 const runtime = read('desktop', 'windows-pc-test', 'RuntimeManager.cs');
+const pcState = read('desktop', 'windows-pc-test', 'PcTestState.cs');
+const pcStatePersistence = read('desktop', 'windows-pc-test', 'PcTestStatePersistence.cs');
 const windowCode = read('desktop', 'windows-pc-test', 'MainWindow.xaml.cs');
 const compose = read('desktop', 'windows-pc-test', 'docker-compose.pc-test.yml');
 const installer = read('scripts', 'windows', 'install-pc-test.ps1');
@@ -70,6 +72,16 @@ assert.match(runtime, /LinguaCafePCTestStudyV4/);
 assert.match(runtime, /127\.0\.0\.1:9396/);
 assert.match(runtime, /linguacafe-pc-test-study-v4/);
 assert.match(runtime, /runtime-version\.txt/);
+// I05: desktop auto-login secret is encrypted for the Windows current user.
+assert.match(pcState, /\[JsonIgnore\]\s*public string AdminPassword/);
+assert.match(pcState, /public int SchemaVersion/);
+assert.match(pcStatePersistence, /ProtectedData\.Protect\(/);
+assert.match(pcStatePersistence, /ProtectedData\.Unprotect\(/);
+assert.match(pcStatePersistence, /DataProtectionScope\.CurrentUser/);
+assert.match(pcStatePersistence, /File\.Replace\(staging, path, null\)/);
+assert.match(runtime, /PcTestStatePersistence\.Load\(StatePath\)/);
+assert.match(runtime, /PcTestStatePersistence\.Save\(StatePath, state\)/);
+assert.doesNotMatch(runtime, /File\.WriteAllText\(StatePath/);
 assert.match(runtime, /DockerImageMatchesRevisionAsync/);
 assert.match(runtime, /org.opencontainers.image.revision/);
 assert.match(runtime, /COMPOSE_DISABLE_ENV_FILE/);

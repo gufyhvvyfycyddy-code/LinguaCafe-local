@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+    <Compile Include="PcTestStateProtectionSmoke.cs" />
+    <Compile Include="../desktop/windows-pc-test/PcTestState.cs" Link="PcTestState.cs" />
+    <Compile Include="../desktop/windows-pc-test/PcTestStatePersistence.cs" Link="PcTestStatePersistence.cs" />
+    <Compile Include="../desktop/windows-pc-test/RuntimeManager.cs" Link="RuntimeManager.cs" />
+  </ItemGroup>
+</Project>
