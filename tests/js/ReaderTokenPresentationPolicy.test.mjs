@@ -18,6 +18,17 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const textBlockSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/TextBlockGroup.vue'), 'utf8');
 const interactiveTextStyles = fs.readFileSync(path.join(root, 'resources/sass/Text/InteractiveTextStyling.scss'), 'utf8');
 
+const readerSource = fs.readFileSync(path.join(root, 'resources/js/components/TextReader/TextReader.vue'), 'utf8');
+
+test('Reader shows saved sentence translations by default without overriding a manual hide on assist reload', () => {
+    assert.match(readerSource, /showAiTranslations:\s*true,/);
+    assert.equal(readerSource.includes('this.showAiTranslations = false'), false);
+    assert.equal(readerSource.includes('this.aiSentenceTranslations = data.sentence_translations || [];'), true);
+    assert.equal(readerSource.includes('this.showAiTranslations = !this.showAiTranslations;'), true);
+    assert.equal(readerSource.includes(':show-ai-translations="showAiTranslations"'), true);
+    assert.equal(textBlockSource.includes('v-if="showAiTranslations && !word.is_structure'), true);
+});
+
 test('applies spaceless layout only to the established languages', () => {
     assert.equal(usesReaderSpacelessLanguage('chinese'), true);
     assert.equal(usesReaderSpacelessLanguage('japanese'), true);

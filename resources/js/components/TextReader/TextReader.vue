@@ -349,7 +349,7 @@
                 saving: false,
 
                 // AI reading assist
-                showAiTranslations: false,
+                showAiTranslations: true,
                 hasSavedAiAssist: false,
                 aiSentenceTranslations: [],
 
@@ -484,9 +484,6 @@
                     if (data.success) {
                         this.hasSavedAiAssist = data.has_saved_assist;
                         this.aiSentenceTranslations = data.sentence_translations || [];
-                        if (!data.has_saved_assist) {
-                            this.showAiTranslations = false;
-                        }
                     }
                 }).catch(() => {
                     // Silently fail — AI assist is optional
