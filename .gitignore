@@ -5,10 +5,29 @@
 /storage/backup
 /vendor
 # Never add local configuration or credential snapshots to Git.
+# Templates may be tracked for development, but git archive always excludes them.
 /.env
 /.env.*
+**/.env*
 !/.env.example
 !/.env.*.example
+!**/.env.example
+!**/.env.*.example
+**/.secrets/
+**/.ssh/
+**/.aws/
+# Deny newly staged credentials even when names are not .env-prefixed.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials*
+*secret*
+.npmrc
+.pypirc
+.netrc
 .phpunit.result.cache
 docker-compose.override.yml
 Homestead.json

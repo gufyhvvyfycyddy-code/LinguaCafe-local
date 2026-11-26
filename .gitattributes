@@ -4,11 +4,73 @@
 *.js linguist-vendored
 CHANGELOG.md export-ignore
 
-# Keep local configuration and credential snapshots out of source archives.
-.env -diff export-ignore
-.env.* -diff export-ignore
-.env.example -export-ignore
-.env.*.example -export-ignore
+# Keep all environment variants, credentials, and agent/browser artifacts out
+# of git archive ZIPs, including nested paths and tracked templates.
+.env* export-ignore
+**/.env* export-ignore
+*.pem export-ignore
+**/*.pem export-ignore
+*.key export-ignore
+**/*.key export-ignore
+*.p12 export-ignore
+**/*.p12 export-ignore
+*.pfx export-ignore
+**/*.pfx export-ignore
+*.jks export-ignore
+**/*.jks export-ignore
+*.keystore export-ignore
+**/*.keystore export-ignore
+*secret* export-ignore
+**/*secret* export-ignore
+credentials* export-ignore
+**/credentials* export-ignore
+.secrets/** export-ignore
+**/.secrets/** export-ignore
+.npmrc export-ignore
+**/.npmrc export-ignore
+.pypirc export-ignore
+**/.pypirc export-ignore
+.netrc export-ignore
+**/.netrc export-ignore
+.ssh/** export-ignore
+**/.ssh/** export-ignore
+.aws/** export-ignore
+**/.aws/** export-ignore
+.playwright-cli/** export-ignore
+**/.playwright-cli/** export-ignore
+.codex/** export-ignore
+**/.codex/** export-ignore
+.opencode/** export-ignore
+**/.opencode/** export-ignore
+.codebuddy/** export-ignore
+**/.codebuddy/** export-ignore
+.trae/** export-ignore
+**/.trae/** export-ignore
+.claude/** export-ignore
+**/.claude/** export-ignore
+.omo/** export-ignore
+**/.omo/** export-ignore
+.reasonix/** export-ignore
+**/.reasonix/** export-ignore
+.reasonix-m6b-tmp/** export-ignore
+**/.reasonix-m6b-tmp/** export-ignore
+.tmp-extract-goal/** export-ignore
+**/.tmp-extract-goal/** export-ignore
+cookies.txt export-ignore
+**/cookies.txt export-ignore
+login.html export-ignore
+**/login.html export-ignore
+routes.txt export-ignore
+**/routes.txt export-ignore
+body.md export-ignore
+**/body.md export-ignore
+after_*.png export-ignore
+**/after_*.png export-ignore
+*_page.png export-ignore
+**/*_page.png export-ignore
+output/** export-ignore
+screenshots/** export-ignore
+audit_screenshots/** export-ignore
 
 # make sure executables have the right line endings
 *.sh text eol=lf
