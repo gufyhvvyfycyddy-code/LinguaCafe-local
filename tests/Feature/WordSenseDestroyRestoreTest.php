@@ -302,6 +302,29 @@ class WordSenseDestroyRestoreTest extends TestCase
     //  E. deleteReviewLogs=true deletes only matching user/language/card logs
     // ════════════════════════════════════════════════════════════════
 
+    public function test_removing_sense_preserves_cards_with_mismatched_owner_or_language(): void
+    {
+        foreach ([true, false] as $deleteReviewCard) {
+            foreach (['owner', 'language'] as $mismatch) {
+                $sense = $this->createSense('mismatch_' . $mismatch . '_' . (int) $deleteReviewCard);
+                $card = $this->createSenseCard($sense, $mismatch === 'owner'
+                    ? ['user_id' => $this->otherUser->id]
+                    : ['language_id' => 'french', 'language' => 'french']);
+                $log = $this->createReviewLog($card);
+
+                $this->wordSenseService->removeSenseFromReviewSystem($sense, $deleteReviewCard, true);
+
+                $this->assertDatabaseHas('review_cards', [
+                    'id' => $card->id,
+                    'user_id' => $card->user_id,
+                    'language_id' => $card->language_id,
+                    'fsrs_enabled' => true,
+                ]);
+                $this->assertDatabaseHas('review_logs', ['id' => $log->id]);
+            }
+        }
+    }
+
     public function test_delete_review_logs_true_deletes_only_matching_logs(): void
     {
         // Current user's sense card + log

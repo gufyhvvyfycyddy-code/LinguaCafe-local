@@ -51,7 +51,14 @@ class WordSense extends Model
     public function reviewCard()
     {
         return $this->hasOne(ReviewCard::class, 'target_id')
-            ->where('target_type', ReviewCard::TARGET_SENSE);
+            ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('word_senses as matching_sense')
+                    ->whereColumn('matching_sense.id', 'review_cards.target_id')
+                    ->whereColumn('matching_sense.user_id', 'review_cards.user_id')
+                    ->whereColumn('matching_sense.language_id', 'review_cards.language_id');
+            });
     }
 
     public function tags()

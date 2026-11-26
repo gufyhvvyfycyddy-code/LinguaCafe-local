@@ -35,6 +35,8 @@ class LearnedSenseExportService
             ->select('word_senses.*')
             ->join('review_cards', function ($join) {
                 $join->on('review_cards.target_id', '=', 'word_senses.id')
+                    ->on('review_cards.user_id', '=', 'word_senses.user_id')
+                    ->on('review_cards.language_id', '=', 'word_senses.language_id')
                     ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
             })
             ->where('word_senses.user_id', $userId)

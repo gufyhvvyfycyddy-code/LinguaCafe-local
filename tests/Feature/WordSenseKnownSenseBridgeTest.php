@@ -8,6 +8,7 @@ use App\Models\ReviewLog;
 use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\LearnedSenseExportService;
 use App\Services\WordSenseKnownSenseService;
 use App\Services\WordSenseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -217,6 +218,116 @@ class WordSenseKnownSenseBridgeTest extends TestCase
         $this->assertSame(3, $entry['fsrs_reps']);
         $this->assertSame('review', $entry['fsrs_state']);
         $this->assertTrue($entry['fsrs_enabled']);
+    }
+
+    public function test_mismatched_review_cards_are_invisible_to_lazy_eager_and_export_reads(): void
+    {
+        $sense = $this->createConfirmedSense('ownership_probe', 'ownership_probes', '权属检验');
+        $cardData = [
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_state' => 'review',
+            'fsrs_enabled' => true,
+            'fsrs_reps' => 9,
+        ];
+
+        ReviewCard::forceCreate(array_merge($cardData, [
+            'user_id' => $this->otherUser->id,
+            'language_id' => 'english',
+        ]));
+        ReviewCard::forceCreate(array_merge($cardData, [
+            'user_id' => $this->user->id,
+            'language_id' => 'french',
+            'language' => 'french',
+        ]));
+
+        $this->assertNull($sense->fresh()->reviewCard);
+        $this->assertNull(WordSense::with('reviewCard')->findOrFail($sense->id)->reviewCard);
+        $this->assertNull(WordSense::findOrFail($sense->id)->load('reviewCard')->reviewCard);
+        $this->assertNull($sense->reviewCard()->value('id'));
+        $this->assertFalse(WordSense::whereKey($sense->id)->whereHas('reviewCard')->exists());
+        $exportService = app(LearnedSenseExportService::class);
+        $this->assertSame(0, $exportService->count($this->user->id, 'english'));
+        $emptyExport = $exportService->payload($this->user->id, 'english');
+        $this->assertSame([], $emptyExport['senses']);
+        $this->assertSame(0, $emptyExport['total_available']);
+
+        $payload = $this->knownSenseService->knownSenseLookupPayload($this->user->id, 'english', 'ownership_probe');
+        $this->assertFalse($payload['confirmed_senses'][0]['has_review_card']);
+        $this->assertNull($payload['confirmed_senses'][0]['review_card_id']);
+
+        $goodCard = ReviewCard::forceCreate(array_merge($cardData, [
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+        ]));
+        $this->assertSame($goodCard->id, $sense->fresh()->reviewCard?->id);
+        $this->assertSame($goodCard->id, WordSense::with('reviewCard')->findOrFail($sense->id)->reviewCard?->id);
+        $this->assertSame($goodCard->id, WordSense::findOrFail($sense->id)->load('reviewCard')->reviewCard?->id);
+        $this->assertSame($goodCard->id, (int) $sense->reviewCard()->value('id'));
+        $this->assertTrue(WordSense::whereKey($sense->id)->whereHas('reviewCard')->exists());
+        $this->assertSame(1, $exportService->count($this->user->id, 'english'));
+        $export = $exportService->payload($this->user->id, 'english');
+        $this->assertCount(1, $export['senses']);
+        $this->assertSame($sense->id, $export['senses'][0]['sense_id']);
+        $this->assertSame('review', $export['senses'][0]['fsrs_state']);
+        $this->assertSame('reviewed', $export['senses'][0]['learned_status']);
+        $this->assertSame(1, $export['total_available']);
+    }
+
+    public function test_multi_parent_eager_load_keeps_each_parent_owner_and_language(): void
+    {
+        $englishSense = $this->createConfirmedSense('parallel_english', 'parallel_english', '英文词义');
+        $frenchSense = $this->wordSenseService->createSense([
+            'user_id' => $this->otherUser->id,
+            'language' => 'french',
+            'language_id' => 'french',
+            'lemma' => 'parallel_french',
+            'surface_form' => 'parallel_french',
+            'pos' => 'noun',
+            'sense_zh' => '法文测试词义',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => '',
+            'example_sentence_zh' => '',
+        ]);
+        $frenchSense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $englishCard = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $englishSense->id,
+            'fsrs_state' => 'new',
+            'fsrs_enabled' => true,
+        ]);
+        $frenchCard = ReviewCard::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'language_id' => 'french',
+            'language' => 'french',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $frenchSense->id,
+            'fsrs_state' => 'review',
+            'fsrs_enabled' => true,
+        ]);
+        ReviewCard::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'language_id' => 'french',
+            'language' => 'french',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $englishSense->id,
+            'fsrs_state' => 'relearning',
+        ]);
+
+        $loaded = WordSense::with('reviewCard')
+            ->whereIn('id', [$englishSense->id, $frenchSense->id])
+            ->get()
+            ->keyBy('id');
+        $this->assertCount(2, $loaded);
+        $this->assertSame($englishCard->id, $loaded[$englishSense->id]->reviewCard?->id);
+        $this->assertSame($frenchCard->id, $loaded[$frenchSense->id]->reviewCard?->id);
     }
 
     public function test_known_sense_lookup_normalizes_lemma_lowercase_trim(): void
