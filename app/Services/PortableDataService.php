@@ -91,9 +91,10 @@ class PortableDataService
 
         try {
             $content = $this->contentEnvelope($items, $userId, $language, true);
+            $exportSenseIds = array_column($items, 'word_sense_id');
             $articles = $this->articleEnvelope($userId, $language);
             $settings = $this->settingsEnvelope($userId);
-            $history = $this->historyEnvelope($userId, $language);
+            $history = $this->historyEnvelope($userId, $language, $exportSenseIds);
             $files = [
                 'content.json' => $this->encode($content),
                 'articles.json' => $this->encode($articles),
@@ -103,7 +104,7 @@ class PortableDataService
             $mediaFiles = [];
             $mediaEnvelope = null;
             if ($includeMedia) {
-                [$mediaEnvelope, $mediaFiles] = $this->mediaEnvelope($userId, $language);
+                [$mediaEnvelope, $mediaFiles] = $this->mediaEnvelope($userId, $language, $exportSenseIds);
                 $files['media.json'] = $this->encode($mediaEnvelope);
             }
             $fileManifest = array_map(fn (string $bytes) => [
@@ -446,12 +447,13 @@ class PortableDataService
     }
 
     /** @return array{0:array,1:array<string,array{path:string,sha256:string,size_bytes:int}>} */
-    private function mediaEnvelope(int $userId, string $language): array
+    private function mediaEnvelope(int $userId, string $language, array $exportSenseIds): array
     {
         $origin = $this->importPlan->portableOrigin($userId);
         $references = MediaReference::query()
             ->where('user_id', $userId)
             ->where('language_id', $language)
+            ->whereIn('word_sense_id', $exportSenseIds)
             ->with('asset')
             ->orderBy('id')
             ->get();
@@ -982,12 +984,13 @@ class PortableDataService
         return ['format' => 'linguacafe-settings', 'format_version' => self::FORMAT_VERSION, 'items' => $items];
     }
 
-    private function historyEnvelope(int $userId, string $language): array
+    private function historyEnvelope(int $userId, string $language, array $exportSenseIds): array
     {
         $origin = $this->importPlan->portableOrigin($userId);
         $items = ReviewLog::query()
             ->where('review_logs.user_id', $userId)
             ->where('review_logs.language_id', $language)
+            ->whereIn('review_cards.target_id', $exportSenseIds)
             ->join('review_cards', function ($join) use ($userId, $language) {
                 $join->on('review_cards.id', '=', 'review_logs.review_card_id')
                     ->where('review_cards.user_id', $userId)

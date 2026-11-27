@@ -264,16 +264,24 @@ class M16PortableDataTest extends TestCase
             'password_changed' => true, 'uuid' => (string) Str::uuid(),
         ]);
         [$foreignSense] = $this->senseCardFor($foreignUser, 'foreign-private');
-        ReviewCard::forceCreate([
+        $foreignBoundCard = ReviewCard::forceCreate([
             'user_id' => $this->user->id, 'language' => 'english', 'language_id' => 'english',
             'target_type' => ReviewCard::TARGET_SENSE, 'target_id' => $foreignSense->id,
             'fsrs_state' => 'review', 'fsrs_due_at' => now()->addDay(),
             'fsrs_enabled' => true, 'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
         ]);
-        [$unconfirmed] = $this->senseCard('pending-private');
+        [$unconfirmed, $unconfirmedCard] = $this->senseCard('pending-private');
         $unconfirmed->forceFill(['status' => WordSense::STATUS_AI_SUGGESTED])->save();
         [$wrongLanguage] = $this->senseCard('wrong-language-private');
         $wrongLanguage->forceFill(['language' => 'spanish', 'language_id' => 'spanish'])->save();
+        foreach ([$foreignBoundCard, $unconfirmedCard] as $card) {
+            ReviewLog::forceCreate([
+                'user_id' => $this->user->id, 'language' => 'english', 'language_id' => 'english',
+                'review_card_id' => $card->id, 'rating' => 'good',
+                'reviewed_at' => now()->subHour(), 'previous_state' => 'learning',
+                'new_state' => 'review', 'source' => 'test',
+            ]);
+        }
 
         $beforeCards = ReviewCard::count();
         $response = $this->actingAs($this->user)
@@ -285,14 +293,19 @@ class M16PortableDataTest extends TestCase
         $this->assertTrue($zip->open($path) === true);
         try {
             $content = json_decode($zip->getFromName('content.json'), true, 512, JSON_THROW_ON_ERROR);
+            $history = json_decode($zip->getFromName('history.json'), true, 512, JSON_THROW_ON_ERROR);
         } finally {
             $zip->close();
         }
 
         $this->assertSame(['own-confirmed'], array_column($content['items'], 'lemma'));
         $this->assertSame(1, $content['count']);
+        $this->assertSame([], $history['items']);
+        $this->actingAs($this->user)->post('/review-cards/manage/portable/import-preview', [
+            'file' => new UploadedFile($path, 'portable.lcpkg', 'application/zip', null, true),
+        ])->assertOk()->assertJsonPath('counts.history', 0);
         $this->assertSame($beforeCards, ReviewCard::count());
-        $this->assertDatabaseCount('review_logs', 0);
+        $this->assertDatabaseCount('review_logs', 2);
     }
 
     public function test_full_package_manifest_counts_only_exported_sense_history(): void
