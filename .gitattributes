@@ -68,9 +68,18 @@ after_*.png export-ignore
 **/after_*.png export-ignore
 *_page.png export-ignore
 **/*_page.png export-ignore
+output export-ignore
 output/** export-ignore
+**/output export-ignore
+**/output/** export-ignore
+screenshots export-ignore
 screenshots/** export-ignore
+**/screenshots export-ignore
+**/screenshots/** export-ignore
+audit_screenshots export-ignore
 audit_screenshots/** export-ignore
+**/audit_screenshots export-ignore
+**/audit_screenshots/** export-ignore
 
 # make sure executables have the right line endings
 *.sh text eol=lf

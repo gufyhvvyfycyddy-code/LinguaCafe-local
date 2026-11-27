@@ -76,7 +76,13 @@ vendor
 **/after_*.png
 **/*_page.png
 output
+**/output
+**/output/**
 screenshots
+**/screenshots
+**/screenshots/**
 audit_screenshots
+**/audit_screenshots
+**/audit_screenshots/**
 storage/backup
 .tmp-public-review-build*
