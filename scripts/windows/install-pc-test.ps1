@@ -3,6 +3,24 @@ param([switch]$StageOnly, [switch]$ActivateStaged)
 $ErrorActionPreference = "Stop"
 if ($StageOnly -and $ActivateStaged) { throw "StageOnly and ActivateStaged are mutually exclusive." }
 
+function Get-ReleaseFileManifest([string]$root) {
+    $fullRoot = (Get-Item -LiteralPath $root).FullName.TrimEnd('\')
+    return @(
+        Get-ChildItem -LiteralPath $fullRoot -Recurse -File -Force |
+            Where-Object { $_.FullName -ne (Join-Path $fullRoot "release-manifest.json") } |
+            Sort-Object FullName |
+            ForEach-Object {
+                if ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                    throw "PC release contains a file link; refusing to validate external content."
+                }
+                [pscustomobject]@{
+                    Path = $_.FullName.Substring($fullRoot.Length + 1).Replace('\', '/')
+                    SHA256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                }
+            }
+    )
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectDir = (Resolve-Path (Join-Path $scriptDir "..\..")).Path
 Push-Location $projectDir
@@ -43,11 +61,26 @@ try {
         $marker = Join-Path $releaseDir "runtime-version.txt"
         $publishedZip = Join-Path $releaseDir "runtime-source.zip"
         $publishedExe = Join-Path $releaseDir "LinguaCafe PC Test.exe"
+        $publishedManifest = Join-Path $releaseDir "release-manifest.json"
+        if (-not (Test-Path -LiteralPath $publishedManifest -PathType Leaf)) {
+            throw "Staged PC Test release file manifest is missing."
+        }
         if (-not (Test-Path -LiteralPath $marker -PathType Leaf) -or
             (Get-Content -LiteralPath $marker -Raw).Trim() -ne $commit -or
             -not (Test-Path -LiteralPath $publishedZip -PathType Leaf) -or
             -not (Test-Path -LiteralPath $publishedExe -PathType Leaf)) {
             throw "Staged PC Test revision is incomplete or does not match HEAD."
+        }
+        $expectedFiles = Get-Content -LiteralPath $publishedManifest -Raw | ConvertFrom-Json
+        $actualFiles = @(Get-ReleaseFileManifest $releaseDir)
+        if ($expectedFiles.Count -eq 0 -or $expectedFiles.Count -ne $actualFiles.Count) {
+            throw "Staged PC Test release file manifest does not match the package."
+        }
+        for ($i = 0; $i -lt $expectedFiles.Count; $i++) {
+            if ($expectedFiles[$i].Path -cne $actualFiles[$i].Path -or
+                $expectedFiles[$i].SHA256 -cne $actualFiles[$i].SHA256) {
+                throw "Staged PC Test release file checksum mismatch."
+            }
         }
     }
     elseif (Test-Path -LiteralPath $releaseDir) {
@@ -143,9 +176,16 @@ try {
         }
 
         Set-Content -LiteralPath (Join-Path $stageDir "runtime-version.txt") -Value $commit -Encoding ascii -NoNewline
+        $releaseFiles = @(Get-ReleaseFileManifest $stageDir)
+        if ($releaseFiles.Count -eq 0) { throw "PC release has no files to verify." }
+        $releaseFiles | ConvertTo-Json -Depth 3 |
+            Set-Content -LiteralPath (Join-Path $stageDir "release-manifest.json") -Encoding UTF8
     }
     $desktop = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktop "LinguaCafe PC Test Study V5.lnk"
+    $shortcutExisted = Test-Path -LiteralPath $shortcutPath -PathType Leaf
+    $shortcutSwitchAttempted = $false
+    $shortcutBackup = $null
     $tempShortcut = Join-Path $desktop ("LinguaCafe PC Test." + $nonce + ".lnk")
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($tempShortcut)
@@ -165,21 +205,40 @@ try {
         }
     }
     try {
-        if (Test-Path -LiteralPath $shortcutPath) {
+        if ($shortcutExisted) {
             $shortcutBackup = Join-Path $installRoot ("shortcut-before-" + $nonce + ".lnk")
             # Keep a verified D-drive rollback copy; File.Replace's temporary backup must stay on C:.
             [System.IO.File]::Copy($shortcutPath, $shortcutBackup)
             $localBackup = $shortcutPath + ".before-" + $nonce + ".bak"
+            $shortcutSwitchAttempted = $true
             [System.IO.File]::Replace($tempShortcut, $shortcutPath, $localBackup)
             try { [System.IO.File]::Delete($localBackup) }
             catch { Write-Warning "Could not remove the temporary shortcut backup; D-drive rollback remains intact." }
         }
         else {
+            $shortcutSwitchAttempted = $true
             [System.IO.File]::Move($tempShortcut, $shortcutPath)
         }
         $tempShortcut = $null
     }
     catch {
+        if ($shortcutSwitchAttempted) {
+            try {
+                if ($shortcutExisted) {
+                    if (-not (Test-Path -LiteralPath $shortcutBackup -PathType Leaf)) {
+                        throw "The previous PC Test shortcut backup is unavailable."
+                    }
+                    [System.IO.File]::Copy($shortcutBackup, $shortcutPath, $true)
+                }
+                elseif (Test-Path -LiteralPath $shortcutPath -PathType Leaf) {
+                    [System.IO.File]::Delete($shortcutPath)
+                }
+            }
+            catch {
+                # Keep the release directory intact if restoring the shortcut fails.
+                throw "PC Test shortcut recovery failed; staged release preserved for manual recovery."
+            }
+        }
         # On activation failure, keep the staged revision intact for a retry.
         if (-not $ActivateStaged) {
             $stageDir = Join-Path $installRoot ("staging-" + $nonce)

@@ -297,8 +297,75 @@ if ($unsafeImageCount -ne 2) { throw 'Python image checker missed private files'
         'staged ZIP integrity: ' + (checked.stderr || checked.stdout || checked.error));
     }
 
-    for (const [activateStaged, fail] of [[false, false], [false, true], [true, false], [true, true]]) {
-      const caseName = (activateStaged ? 'activate-' : 'fresh-') + (fail ? 'fail' : 'success');
+    // Execute actual installer manifest logic against disposable Windows EXE/DLL fixtures.
+    const mfStart = installer.indexOf('function Get-ReleaseFileManifest(');
+    const mfEnd = installer.indexOf('\r\n$scriptDir', mfStart);
+    const buildStart = installer.indexOf('        $releaseFiles = @(Get-ReleaseFileManifest $stageDir)');
+    const buildEnd = installer.indexOf('\r\n    }\r\n    $desktop', buildStart);
+    const validateStart = installer.indexOf('        $expectedFiles = Get-Content -LiteralPath $publishedManifest -Raw | ConvertFrom-Json');
+    const validateEnd = installer.indexOf('\r\n    }\r\n    elseif (Test-Path -LiteralPath $releaseDir)', validateStart);
+    assert.ok(mfStart > 0 && mfEnd > mfStart);
+    assert.ok(buildStart > 0 && buildEnd > buildStart);
+    assert.ok(validateStart > 0 && validateEnd > validateStart);
+    assert.ok(validateEnd < installer.indexOf('$desktop = [Environment]::GetFolderPath'));
+    const manifestFunction = installer.slice(mfStart, mfEnd);
+    const manifestBuild = installer.slice(buildStart, buildEnd);
+    const manifestValidate = installer.slice(validateStart, validateEnd);
+    const payloadDir = path.join(temp, 'manifest-release');
+    fs.mkdirSync(path.join(payloadDir, 'runtimes'), { recursive: true });
+    const executable = path.join(payloadDir, 'LinguaCafe PC Test.exe');
+    const library = path.join(payloadDir, 'runtimes', 'Engine.dll');
+    const manifestPath = path.join(payloadDir, 'release-manifest.json');
+    fs.writeFileSync(executable, 'synthetic executable bytes');
+    fs.writeFileSync(library, 'synthetic dependent library bytes');
+    fs.writeFileSync(path.join(payloadDir, 'runtime-version.txt'), 'synthetic-sha');
+    const createScript = path.join(temp, 'manifest-create.ps1');
+    const validateScript = path.join(temp, 'manifest-validate.ps1');
+    fs.writeFileSync(createScript, [
+      "$ErrorActionPreference='Stop'", manifestFunction,
+      '$stageDir=' + quote(payloadDir), manifestBuild,
+    ].join('\r\n'), 'utf8');
+    fs.writeFileSync(validateScript, [
+      "$ErrorActionPreference='Stop'", manifestFunction,
+      '$releaseDir=' + quote(payloadDir),
+      '$publishedManifest=Join-Path $releaseDir "release-manifest.json"',
+      manifestValidate,
+    ].join('\r\n'), 'utf8');
+    const runManifest = (file) => spawnSync('powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-File', file],
+      { encoding: 'utf8', timeout: 20000, windowsHide: true });
+    const created = runManifest(createScript);
+    assert.equal(created.status, 0, 'create manifest: ' + (created.stderr || created.stdout || created.error));
+    const originalManifest = fs.readFileSync(manifestPath);
+    const checkManifest = (code, label) => {
+      const checked = runManifest(validateScript);
+      assert.equal(checked.status, code, label + ': ' + (checked.stderr || checked.stdout || checked.error));
+    };
+    checkManifest(0, 'unchanged file set');
+    fs.appendFileSync(executable, 'changed');
+    checkManifest(1, 'modified executable');
+    fs.writeFileSync(executable, 'synthetic executable bytes');
+    fs.appendFileSync(library, 'changed');
+    checkManifest(1, 'modified dependent DLL');
+    fs.writeFileSync(library, 'synthetic dependent library bytes');
+    fs.writeFileSync(path.join(payloadDir, 'unexpected.data'), 'unexpected');
+    checkManifest(1, 'unexpected extra file');
+    fs.rmSync(path.join(payloadDir, 'unexpected.data'));
+    fs.rmSync(library);
+    checkManifest(1, 'missing dependent DLL');
+    fs.writeFileSync(library, 'synthetic dependent library bytes');
+    fs.writeFileSync(manifestPath, '[{"Path":"wrong","SHA256":"0"}]');
+    checkManifest(1, 'modified manifest');
+    fs.writeFileSync(manifestPath, originalManifest);
+    checkManifest(0, 'restored original file set');
+
+    for (const [activateStaged, fail, failAfterReplace] of [
+      [false, false, false], [false, true, false], [true, false, false], [true, true, false],
+      [false, false, true], [true, false, true],
+    ]) {
+      const shouldFail = fail || failAfterReplace;
+      const caseName = (activateStaged ? 'activate-' : 'fresh-') +
+        (fail ? 'before-fail' : failAfterReplace ? 'after-fail' : 'success');
       const rootDir = path.join(temp, caseName);
       const backupDir = path.join(backupTemp, caseName);
       const stageDir = path.join(backupDir, 'staging-test');
@@ -324,6 +391,10 @@ $new.Save()`;
       assert.notDeepEqual(oldBytes, newBytes);
       if (fail) fs.mkdirSync(shortcut + '.before-test.bak');
       const probeFile = path.join(rootDir, 'switch.ps1');
+      const replaceCall = '[System.IO.File]::Replace($tempShortcut, $shortcutPath, $localBackup)';
+      const testedSwitch = failAfterReplace ? actualSwitch.replace(replaceCall,
+        replaceCall + '\r\n            throw "synthetic after-replace failure"') : actualSwitch;
+      assert.ok(!failAfterReplace || testedSwitch !== actualSwitch, 'missing real shortcut switch');
       fs.writeFileSync(probeFile, `$ErrorActionPreference='Stop'
 $stageDir=${quote(stageDir)}
 $ActivateStaged=${activateStaged ? '$true' : '$false'}
@@ -332,23 +403,26 @@ $shortcutPath=${quote(shortcut)}
 $tempShortcut=${quote(tempShortcut)}
 $installRoot=${quote(backupDir)}
 $nonce='test'
+$shortcutExisted=$true
+$shortcutSwitchAttempted=$false
+$shortcutBackup=$null
 try {
-${actualSwitch}
+${testedSwitch}
 } catch {
-  if (${fail ? '$true' : '$false'}) { exit 19 }
+  if (${shouldFail ? '$true' : '$false'}) { exit 19 }
   throw
 }
 `, 'utf8');
       const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', probeFile],
         { encoding: 'utf8', timeout: 20000, windowsHide: true });
-      assert.equal(result.status, fail ? 19 : 0,
-        `shortcut switch ${fail ? 'failure' : 'success'}: ${result.stderr || result.stdout || result.error}`);
-      assert.equal(fs.existsSync(releaseDir), activateStaged || !fail);
-      assert.equal(fs.existsSync(stageDir), !activateStaged && fail);
-      assert.equal(fs.existsSync(path.join(!activateStaged && fail ? stageDir : releaseDir, 'app.exe')), true);
-      assert.deepEqual(fs.readFileSync(shortcut), fail ? oldBytes : newBytes);
+      assert.equal(result.status, shouldFail ? 19 : 0,
+        `shortcut switch ${caseName}: ${result.stderr || result.stdout || result.error}`);
+      assert.equal(fs.existsSync(releaseDir), activateStaged || !shouldFail);
+      assert.equal(fs.existsSync(stageDir), !activateStaged && shouldFail);
+      assert.equal(fs.existsSync(path.join(!activateStaged && shouldFail ? stageDir : releaseDir, 'app.exe')), true);
+      assert.deepEqual(fs.readFileSync(shortcut), shouldFail ? oldBytes : newBytes);
       assert.deepEqual(fs.readFileSync(path.join(backupDir, 'shortcut-before-test.lnk')), oldBytes);
-      assert.equal(fs.existsSync(shortcut + '.before-test.bak'), fail);
+      assert.equal(fs.existsSync(shortcut + '.before-test.bak'), shouldFail);
     }
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
