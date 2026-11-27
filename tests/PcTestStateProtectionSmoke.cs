@@ -41,6 +41,27 @@ using (var response = new HttpResponseMessage(HttpStatusCode.OK)
 }
 Console.WriteLine("PC HTTP login-readiness guard passed (8 response cases).");
 
+var webId = "sha256:" + new string('1', 64);
+var pythonId = "sha256:" + new string('2', 64);
+var ids = RuntimeManager.ParsePackagedImageIds(JsonSerializer.Serialize(new { web = webId, python = pythonId }));
+Must(ids.Web == webId && ids.Python == pythonId, "exact packaged image IDs must round-trip");
+foreach (var invalidManifest in new[]
+{
+    "{}", "[]", "{",
+    JsonSerializer.Serialize(new { web = webId }),
+    JsonSerializer.Serialize(new { web = "latest", python = pythonId }),
+    JsonSerializer.Serialize(new { web = webId.ToUpperInvariant(), python = pythonId }),
+    JsonSerializer.Serialize(new { web = webId, python = 12 }),
+})
+{
+    var rejected = false;
+    try { RuntimeManager.ParsePackagedImageIds(invalidManifest); }
+    catch (InvalidOperationException) { rejected = true; }
+    catch (JsonException) { rejected = true; }
+    Must(rejected, "malformed or incomplete packaged image identity must fail closed");
+}
+Console.WriteLine("PC packaged image manifest guard passed (8 manifest cases).");
+
 var testRoot = Path.Combine(Path.GetTempPath(),
     "linguacafe-pc-state-synthetic-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(testRoot);

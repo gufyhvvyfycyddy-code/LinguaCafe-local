@@ -4,6 +4,8 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace LinguaCafe.PcTest;
 
@@ -64,8 +66,9 @@ public sealed class RuntimeManager
         report("正在检查 Docker Desktop…");
         await EnsureDockerAsync(cancellationToken);
 
-        var runtimeRoot = ResolveRuntimeRoot();
+        // Validate the packaged identity before it can be used as a directory name.
         runtimeImageTag = ResolveRuntimeImageTag();
+        var runtimeRoot = ResolveRuntimeRoot();
         var composeFile = Path.Combine(runtimeRoot, "desktop", "windows-pc-test", "docker-compose.pc-test.yml");
         if (!File.Exists(composeFile))
         {
@@ -79,23 +82,25 @@ public sealed class RuntimeManager
 
         var webImage = $"linguacafe-pc-test-web:{runtimeImageTag}";
         var pythonImage = $"linguacafe-pc-test-python:{runtimeImageTag}";
-        var canReusePackagedImages = runtimeImageTag != "dev"
-            && await DockerImageMatchesRevisionAsync(webImage, runtimeImageTag, cancellationToken)
-            && await DockerImageMatchesRevisionAsync(pythonImage, runtimeImageTag, cancellationToken);
-        if (canReusePackagedImages)
+        if (runtimeImageTag != "dev")
         {
-            report($"正在复用 PC 测试运行时 {runtimeImageTag[..12]}…");
+            var manifest = Path.Combine(AppContext.BaseDirectory, "runtime-images.json");
+            if (!File.Exists(manifest))
+            {
+                throw new InvalidOperationException("已打包的 PC 测试版缺少镜像验收记录。请重新暂存并验收该版本，不要删除学习数据。");
+            }
+            var (expectedWeb, expectedPython) = ParsePackagedImageIds(File.ReadAllText(manifest));
+            if (!await DockerImageMatchesRevisionAsync(webImage, runtimeImageTag, expectedWeb, cancellationToken)
+                || !await DockerImageMatchesRevisionAsync(pythonImage, runtimeImageTag, expectedPython, cancellationToken))
+            {
+                throw new InvalidOperationException("PC 测试版镜像已丢失或与验收记录不符。请重新暂存并验收该版本，不要删除学习数据。");
+            }
+            report($"正在复用已核镜像 {runtimeImageTag[..12]}…");
         }
         else
         {
-            report("首次运行或版本更新：正在构建 LinguaCafe PC 测试运行时…");
+            report("开发模式：正在构建 LinguaCafe PC 测试运行时…");
             await RunDockerAsync([.. common, "build", "web", "python"], runtimeRoot, cancellationToken);
-        }
-        if (runtimeImageTag != "dev"
-            && (!await DockerImageMatchesRevisionAsync(webImage, runtimeImageTag, cancellationToken)
-                || !await DockerImageMatchesRevisionAsync(pythonImage, runtimeImageTag, cancellationToken)))
-        {
-            throw new InvalidOperationException("PC test Docker image revision does not match the packaged source.");
         }
 
         report("正在启动独立 MySQL / Redis / tokenizer…");
@@ -135,11 +140,19 @@ public sealed class RuntimeManager
         var versionFile = Path.Combine(AppContext.BaseDirectory, "runtime-version.txt");
         if (!File.Exists(versionFile))
         {
+            if (File.Exists(Path.Combine(AppContext.BaseDirectory, "runtime-source.zip")))
+            {
+                throw new InvalidOperationException("PC test packaged source is missing its commit marker.");
+            }
             return "dev";
         }
 
+        if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "runtime-source.zip")))
+        {
+            throw new InvalidOperationException("PC test commit marker has no packaged source archive.");
+        }
         var version = File.ReadAllText(versionFile).Trim();
-        if (version.Length < 7 || version.Length > 64 || !version.All(Uri.IsHexDigit))
+        if (version.Length != 40 || !version.All(Uri.IsHexDigit))
         {
             throw new InvalidOperationException("PC test runtime version marker is invalid.");
         }
@@ -147,11 +160,33 @@ public sealed class RuntimeManager
         return version.ToLowerInvariant();
     }
 
-    private static async Task<bool> DockerImageMatchesRevisionAsync(string image, string revision, CancellationToken cancellationToken)
+    internal static (string Web, string Python) ParsePackagedImageIds(string json)
     {
+        using var document = JsonDocument.Parse(json);
+        static string ReadId(JsonElement root, string name)
+        {
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty(name, out var value) ||
+                value.ValueKind != JsonValueKind.String ||
+                value.GetString() is not { } id || !Regex.IsMatch(id, @"\Asha256:[0-9a-f]{64}\z"))
+            {
+                throw new InvalidOperationException("PC test packaged image manifest is invalid.");
+            }
+            return id;
+        }
+        return (ReadId(document.RootElement, "web"), ReadId(document.RootElement, "python"));
+    }
+
+    private static async Task<bool> DockerImageMatchesRevisionAsync(string image, string revision, string expectedId, CancellationToken cancellationToken)
+    {
+        var id = await RunProcessAsync("docker", ["image", "inspect", "--format", "{{.Id}}", image],
+            null, cancellationToken, throwOnFailure: false);
+        if (id.ExitCode != 0 || id.StandardOutput.Trim() != expectedId)
+        {
+            return false;
+        }
         var result = await RunProcessAsync(
             "docker",
-            ["image", "inspect", "--format", "{{ index .Config.Labels \"org.opencontainers.image.revision\" }}", image],
+            ["image", "inspect", "--format", "{{ index .Config.Labels \"org.opencontainers.image.revision\" }}", expectedId],
             null,
             cancellationToken,
             throwOnFailure: false);
@@ -163,10 +198,7 @@ public sealed class RuntimeManager
         var packagedZip = Path.Combine(AppContext.BaseDirectory, "runtime-source.zip");
         if (File.Exists(packagedZip))
         {
-            var versionFile = Path.Combine(AppContext.BaseDirectory, "runtime-version.txt");
-            var version = File.Exists(versionFile)
-                ? File.ReadAllText(versionFile).Trim()
-                : File.GetLastWriteTimeUtc(packagedZip).Ticks.ToString();
+            var version = runtimeImageTag;
             var target = Path.Combine(appDataRoot, "runtime", version);
             var marker = Path.Combine(target, ".pc-test-runtime-ready");
             if (!File.Exists(marker))
