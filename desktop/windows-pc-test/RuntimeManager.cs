@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 
@@ -303,17 +304,26 @@ public sealed class RuntimeManager
         return result;
     }
 
+    internal static bool IsLoginPageReady(HttpResponseMessage response) =>
+        response.StatusCode == HttpStatusCode.OK &&
+        string.Equals(response.Content.Headers.ContentType?.MediaType, "text/html", StringComparison.OrdinalIgnoreCase);
+
     private static async Task WaitForHttpAsync(string url, CancellationToken cancellationToken)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+        {
+            Timeout = TimeSpan.FromSeconds(4),
+        };
         var deadline = DateTime.UtcNow.AddMinutes(2);
+        HttpStatusCode? lastStatus = null;
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 using var response = await http.GetAsync(url, cancellationToken);
-                if ((int)response.StatusCode < 500)
+                lastStatus = response.StatusCode;
+                if (IsLoginPageReady(response))
                 {
                     return;
                 }
@@ -328,7 +338,8 @@ public sealed class RuntimeManager
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
 
-        throw new TimeoutException("LinguaCafe PC test server did not become ready within two minutes.");
+        var status = lastStatus is { } code ? $"HTTP {(int)code}" : "未收到 HTTP 响应";
+        throw new TimeoutException($"LinguaCafe 登录页两分钟内未返回 HTTP 200 HTML（最后状态：{status}）。请保留本地数据并检查服务。 ");
     }
 
     private sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError);

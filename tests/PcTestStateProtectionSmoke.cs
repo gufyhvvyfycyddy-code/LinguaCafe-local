@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -10,6 +12,34 @@ static void Must(bool condition, string message)
         throw new InvalidOperationException("PC state synthetic smoke: " + message);
     }
 }
+
+// The startup probe must distinguish a real login document from errors,
+// redirects, empty responses, and JSON on the same endpoint.
+foreach (var status in new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden,
+    HttpStatusCode.NotFound, HttpStatusCode.InternalServerError, HttpStatusCode.Redirect,
+    HttpStatusCode.NoContent })
+{
+    using var response = new HttpResponseMessage(status)
+    {
+        Content = new StringContent("synthetic", Encoding.UTF8, "text/html"),
+    };
+    Must(!RuntimeManager.IsLoginPageReady(response), $"HTTP {(int)status} must not pass login readiness");
+}
+using (var response = new HttpResponseMessage(HttpStatusCode.OK)
+{
+    Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+})
+{
+    Must(!RuntimeManager.IsLoginPageReady(response), "HTTP 200 JSON must not pass HTML login readiness");
+}
+using (var response = new HttpResponseMessage(HttpStatusCode.OK)
+{
+    Content = new StringContent("<html>synthetic login</html>", Encoding.UTF8, "text/html"),
+})
+{
+    Must(RuntimeManager.IsLoginPageReady(response), "HTTP 200 HTML must pass login readiness");
+}
+Console.WriteLine("PC HTTP login-readiness guard passed (8 response cases).");
 
 var testRoot = Path.Combine(Path.GetTempPath(),
     "linguacafe-pc-state-synthetic-" + Guid.NewGuid().ToString("N"));

@@ -44,9 +44,9 @@ public partial class MainWindow : Window
                 await AutoLoginAsync();
             }
 
-            if (CurrentPath() == "/login")
+            if (CurrentPath() is "/login" or "/setup")
             {
-                throw new InvalidOperationException("PC 测试管理员自动登录失败。请删除本地 PC 测试数据后重试。" );
+                throw new InvalidOperationException("PC 测试管理员自动登录失败。请保留本地数据，检查专用测试服务和账号状态后重试。");
             }
 
             UpdateStatus($"PC 测试版已就绪：{CurrentPath()}");
