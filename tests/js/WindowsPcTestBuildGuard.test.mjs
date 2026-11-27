@@ -47,6 +47,12 @@ for (const directory of [
   assert.ok(dockerIgnoredPaths.has(`**/${directory}/**`), `Docker must exclude directory contents: ${directory}`);
 }
 const attrs = read('.gitattributes');
+for (const directory of ['output', 'screenshots', 'audit_screenshots']) {
+  assert.ok(dockerIgnoredPaths.has(`**/${directory}`), `Docker nested ${directory} root must be excluded`);
+  assert.ok(dockerIgnoredPaths.has(`**/${directory}/**`), `Docker nested ${directory} files must be excluded`);
+  assert.match(attrs, new RegExp(`^\\*\\*/${directory} export-ignore$`, 'm'));
+  assert.match(attrs, new RegExp(`^\\*\\*/${directory}/\\*\\* export-ignore$`, 'm'));
+}
 assert.match(attrs, /^\.env\* -diff export-ignore$/m);
 assert.match(attrs, /^\*\*\/\.env\* -diff export-ignore$/m);
 assert.match(attrs, /^\.playwright-cli\/\*\* export-ignore$/m);
@@ -170,12 +176,15 @@ foreach ($unsafe in @($false, $true)) {
     [void]$zip.CreateEntry('.opencode/')
     [void]$zip.CreateEntry('.codebuddy/')
     [void]$zip.CreateEntry('.trae/')
+    [void]$zip.CreateEntry('nested/output/capture.log')
+    [void]$zip.CreateEntry('nested/screenshots/page.png')
+    [void]$zip.CreateEntry('nested/audit_screenshots/audit.txt')
   }
   $zip.Dispose()
   $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
 ${scanner}
   $archive.Dispose()
-  if ($unsafeCount -ne (1 + 4 * [int]$unsafe)) { throw 'Archive scan did not reject browser directory and secret file' }
+  if ($unsafeCount -ne (1 + 7 * [int]$unsafe)) { throw 'Archive scan did not reject nested captures and secret files' }
 }
 `, 'utf8');
     const scanResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', scanFile],
@@ -196,9 +205,10 @@ $imageRoot='/var/www/html'
 $imagePaths=@('/var/www/html/README.md',
  '/var/www/html/vendor/laravel/framework/src/Illuminate/Console/View/Components/Secret.php',
  '/var/www/html/private/.envrc', '/var/www/html/private/.playwright-cli/page.yml',
- '/var/www/html/vendor/laravel/horizon/.npmrc')
+ '/var/www/html/vendor/laravel/horizon/.npmrc',
+ '/var/www/html/docs/audit_screenshots/report.json')
 ${imageScanner}
-if ($unsafeImageCount -ne 3) { throw 'Final-image checker failed to reject private files or vendor npm config' }
+if ($unsafeImageCount -ne 4) { throw 'Final-image checker failed to reject private files, nested captures or vendor npm config' }
 $imagePaths=@('/var/www/html/README.md',
  '/var/www/html/vendor/laravel/framework/src/Illuminate/Console/View/Components/Secret.php',
  '/var/www/html/vendor/laravel/serializable-closure/src/Exceptions/MissingSecretKeyException.php')
@@ -213,6 +223,43 @@ if ($unsafeImageCount -ne 2) { throw 'Python image checker missed private files'
       { encoding: 'utf8', timeout: 20000, windowsHide: true });
     assert.equal(imageProbeResult.status, 0,
       `final-image filename filter: ${imageProbeResult.stderr || imageProbeResult.stdout || imageProbeResult.error}`);
+
+    // A real Git archive must omit tracked nested captures but retain ordinary source.
+    const gitSource = path.join(temp, 'synthetic-git-source');
+    const gitZip = path.join(temp, 'synthetic-git-source.zip');
+    fs.mkdirSync(gitSource);
+    fs.copyFileSync(path.join(root, '.gitattributes'), path.join(gitSource, '.gitattributes'));
+    for (const name of ['nested/output/raw.txt', 'nested/screenshots/page.png',
+      'nested/audit_screenshots/report.txt', 'nested/.envrc', 'nested/keep.txt']) {
+      const file = path.join(gitSource, name);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, 'synthetic only');
+    }
+    for (const args of [
+      ['init', '--quiet'],
+      ['add', '-f', '--', '.gitattributes', 'nested'],
+      ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '--quiet', '-m', 'synthetic'],
+      ['archive', '--format=zip', '--output=' + gitZip, 'HEAD'],
+    ]) {
+      const proc = spawnSync('git', args, { cwd: gitSource, encoding: 'utf8', timeout: 15000 });
+      assert.equal(proc.status, 0, 'isolated Git archive fixture: ' + (proc.stderr || proc.error));
+    }
+    const archiveCheck = path.join(temp, 'git-export-check.ps1');
+    fs.writeFileSync(archiveCheck, [
+      "$ErrorActionPreference='Stop'",
+      'Add-Type -AssemblyName System.IO.Compression.FileSystem',
+      '$zip=[System.IO.Compression.ZipFile]::OpenRead(' + quote(gitZip) + ')',
+      'try {',
+      '  $names=@($zip.Entries | ForEach-Object { $_.FullName })',
+      "  if ($names -notcontains 'nested/keep.txt') { throw 'Allowed source file missing from ZIP' }",
+      "  $unsafe=@($names | Where-Object { $_ -match '(?i)(^|/)(output|screenshots|audit_screenshots)(/|$)|(^|/)\\.env[^/]*$' })",
+      "  if ($unsafe.Count -ne 0) { throw 'Nested private fixture reached ZIP' }",
+      '} finally { $zip.Dispose() }',
+    ].join('\n'), 'utf8');
+    const archiveCheckResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive',
+      '-File', archiveCheck], { encoding: 'utf8', timeout: 15000, windowsHide: true });
+    assert.equal(archiveCheckResult.status, 0,
+      'actual Git ZIP export: ' + (archiveCheckResult.stderr || archiveCheckResult.error));
 
     for (const fail of [false, true]) {
       const rootDir = path.join(temp, fail ? 'fail' : 'success');

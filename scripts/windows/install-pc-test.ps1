@@ -54,7 +54,7 @@ try {
     try {
         # Inspect names only: no secret file contents are opened, logged or uploaded.
         $forbiddenName = '(?i)(^|/)(\.env[^/]*|[^/]*\.(pem|key|p12|pfx|jks|keystore)|[^/]*secret[^/]*|credentials[^/]*|\.secrets|\.playwright-cli|\.codex|\.opencode|\.codebuddy|\.trae|\.claude|\.omo|\.reasonix|\.npmrc|\.pypirc|\.netrc|\.ssh|\.aws)(/|$)'
-        $forbiddenRoot = '(?i)^(data|output|screenshots|audit_screenshots|cookies\.txt|login\.html|routes\.txt|body\.md)(/|$)'
+        $forbiddenRoot = '(?i)((^|/)(output|screenshots|audit_screenshots)(/|$)|^(data|cookies\.txt|login\.html|routes\.txt|body\.md)(/|$))'
         $unsafeCount = @($archive.Entries | Where-Object {
             ((($_.FullName -replace '\\', '/') -match $forbiddenName) -or (($_.FullName -replace '\\', '/') -match $forbiddenRoot))
         }).Count

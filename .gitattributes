@@ -82,6 +82,12 @@ credentials* -diff export-ignore
 /screenshots/** export-ignore
 /audit_screenshots export-ignore
 /audit_screenshots/** export-ignore
+**/output export-ignore
+**/output/** export-ignore
+**/screenshots export-ignore
+**/screenshots/** export-ignore
+**/audit_screenshots export-ignore
+**/audit_screenshots/** export-ignore
 /cookies.txt -diff export-ignore
 /login.html export-ignore
 /routes.txt export-ignore

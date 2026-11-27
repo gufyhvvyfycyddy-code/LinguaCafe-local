@@ -42,6 +42,12 @@
 /output
 /screenshots
 /audit_screenshots
+**/output
+**/output/**
+**/screenshots
+**/screenshots/**
+**/audit_screenshots
+**/audit_screenshots/**
 /cookies.txt
 /login.html
 /routes.txt
