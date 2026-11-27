@@ -142,6 +142,10 @@ assert.match(installer, /COMPOSE_DISABLE_ENV_FILE/);
 assert.match(installer, /runtime-version\.txt/);
 assert.match(installer, /param\(\[switch\]\$StageOnly, \[switch\]\$ActivateStaged\)/);
 assert.match(installer, /git archive --format=zip --output=\$verificationArchive HEAD/);
+assert.match(installer, /Specify exactly one of -StageOnly or -ActivateStaged/);
+assert.match(installer, /docker run --rm --network none --read-only --entrypoint find \$imageId/);
+assert.match(installer, /Assert-PcReleaseImages \$stageDir \$commit/);
+assert.match(installer, /Assert-PcReleaseImages \$releaseDir \$commit/);
 assert.match(installer, /Staged PC Test archive differs from the exact committed source/);
 assert.match(installer, /if \(-not \$ActivateStaged\)/);
 assert.match(installer, /On activation failure, keep the staged revision intact/);
@@ -164,6 +168,64 @@ if (process.platform === 'win32') {
   const crossVolume = path.parse(temp).root.toLowerCase() !== path.parse(backupTemp).root.toLowerCase();
   const quote = (s) => "'" + s.replaceAll("'", "''") + "'";
   try {
+    // Run only the production argument gate, not the installer or deployment.
+    const gate = installer.slice(0, installer.indexOf('function Get-ReleaseFileManifest('));
+    const gateScript = path.join(temp, 'arguments.ps1');
+    fs.writeFileSync(gateScript, gate, 'utf8');
+    for (const [args, expected] of [
+      [[], 1], [['-StageOnly'], 0], [['-ActivateStaged'], 0],
+      [['-StageOnly', '-ActivateStaged'], 1],
+    ]) {
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', gateScript, ...args],
+        { encoding: 'utf8', timeout: 15000, windowsHide: true });
+      assert.equal(result.status, expected, 'installer argument gate: ' + args.join(' '));
+    }
+
+    // Execute the production image identity functions against a mock Docker CLI.
+    // No production image, container or installation is touched.
+    const imageFunctions = installer.slice(
+      installer.indexOf('function Get-VerifiedPcImageId('), installer.indexOf('$scriptDir ='));
+    const identityProbe = path.join(temp, 'image-identity.ps1');
+    fs.writeFileSync(identityProbe, `$ErrorActionPreference='Stop'
+${imageFunctions}
+$commit='a' * 40
+$web='sha256:' + ('1' * 64)
+$python='sha256:' + ('2' * 64)
+$root=${quote(temp)}
+$manifest=Join-Path $root 'runtime-images.json'
+function docker {
+  $global:LASTEXITCODE=0
+  if ($args[3] -eq '{{.Id}}') {
+    if ($script:scenario -eq 'missing') { $global:LASTEXITCODE=1; return }
+    if ($script:scenario -eq 'malformed-id') { return 'invalid' }
+    if ($args[4] -like 'linguacafe-pc-test-web:*') {
+      if ($script:scenario -eq 'retagged') { return ('sha256:' + ('3' * 64)) }
+      return $web
+    }
+    if ($args[4] -like 'linguacafe-pc-test-python:*') { return $python }
+    throw 'Unexpected image tag'
+  }
+  if ($args[3] -eq '{{json .Config.Labels}}') {
+    if ($args[4] -notmatch '^sha256:[0-9a-f]{64}$') { throw 'Labels must be read from immutable image ID' }
+    $revision=if ($script:scenario -eq 'wrong-revision') { 'b' * 40 } else { $commit }
+    return (@{'org.opencontainers.image.revision'=$revision} | ConvertTo-Json -Compress)
+  }
+  throw 'Unexpected Docker query'
+}
+@{web=$web;python=$python} | ConvertTo-Json | Set-Content -LiteralPath $manifest
+foreach ($script:scenario in @('valid','retagged','missing','malformed-id','wrong-revision','missing-manifest','bad-manifest')) {
+  if ($script:scenario -eq 'missing-manifest') { [System.IO.File]::Delete($manifest) }
+  if ($script:scenario -eq 'bad-manifest') { @{web=$web} | ConvertTo-Json | Set-Content -LiteralPath $manifest }
+  $failed=$false
+  try { Assert-PcReleaseImages $root $commit } catch { $failed=$true }
+  if ($failed -ne ($script:scenario -ne 'valid')) { throw ('Unexpected image gate result: ' + $script:scenario) }
+}
+`, 'utf8');
+    const identityResult = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', identityProbe],
+      { encoding: 'utf8', timeout: 20000, windowsHide: true });
+    assert.equal(identityResult.status, 0,
+      'staged image identity gate: ' + (identityResult.stderr || identityResult.stdout || identityResult.error));
+
     // Exercise the stricter installer scanner against a real ZIP: even empty
     // excluded browser directories are unsafe; nested secrets must also fail closed.
     const scanStart = installer.indexOf('        $forbiddenName = ');
@@ -301,7 +363,7 @@ if ($unsafeImageCount -ne 2) { throw 'Python image checker missed private files'
     const mfStart = installer.indexOf('function Get-ReleaseFileManifest(');
     const mfEnd = installer.indexOf('\r\n$scriptDir', mfStart);
     const buildStart = installer.indexOf('        $releaseFiles = @(Get-ReleaseFileManifest $stageDir)');
-    const buildEnd = installer.indexOf('\r\n    }\r\n    $desktop', buildStart);
+    const buildEnd = installer.indexOf('\r\n    }\r\n    if ($ActivateStaged)', buildStart);
     const validateStart = installer.indexOf('        $expectedFiles = Get-Content -LiteralPath $publishedManifest -Raw | ConvertFrom-Json');
     const validateEnd = installer.indexOf('\r\n    }\r\n    elseif (Test-Path -LiteralPath $releaseDir)', validateStart);
     assert.ok(mfStart > 0 && mfEnd > mfStart);

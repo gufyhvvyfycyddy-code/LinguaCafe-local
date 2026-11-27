@@ -64,7 +64,9 @@ The runtime uses test-only database/reverb credentials and never reuses reposito
 
 ## Packaging
 
-`scripts/windows/install-pc-test.ps1` publishes the WPF executable, adds an exact `git archive` source snapshot and commit marker, and creates one desktop shortcut named `LinguaCafe PC Test`.
+`scripts/windows/install-pc-test.ps1` publishes the WPF executable, adds an exact `git archive` source snapshot and commit marker, and creates one desktop shortcut for that test lane.
+
+For Study V5, explicitly select `-StageOnly` to create the immutable candidate without switching the existing shortcut. Only after real GUI acceptance on that exact candidate may `-ActivateStaged` switch it. No-flag and both-flag invocations fail before packaging. Staging scans the inspected Web/Python image IDs (not mutable tags) and includes those IDs in the release file manifest; activation verifies that the commit-tagged local images still resolve to those IDs. Missing, changed or uninspectable IDs stop activation. This is an activation boundary, not a complete runtime attestation or a substitute for actual GUI acceptance.
 
 The installed build is deliberately a test build for the current Windows PC. Code signing, auto-update, installer distribution and public Windows release are outside this first lane.
 

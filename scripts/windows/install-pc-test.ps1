@@ -1,7 +1,7 @@
 param([switch]$StageOnly, [switch]$ActivateStaged)
 
 $ErrorActionPreference = "Stop"
-if ($StageOnly -and $ActivateStaged) { throw "StageOnly and ActivateStaged are mutually exclusive." }
+if ([bool]$StageOnly -eq [bool]$ActivateStaged) { throw "Specify exactly one of -StageOnly or -ActivateStaged; never activate an unvalidated release." }
 
 function Get-ReleaseFileManifest([string]$root) {
     $fullRoot = (Get-Item -LiteralPath $root).FullName.TrimEnd('\')
@@ -19,6 +19,36 @@ function Get-ReleaseFileManifest([string]$root) {
                 }
             }
     )
+}
+
+function Get-VerifiedPcImageId([string]$image, [string]$revision) {
+    $imageIds = @(docker image inspect --format '{{.Id}}' $image)
+    if ($LASTEXITCODE -ne 0 -or $imageIds.Count -ne 1 -or
+        $imageIds[0] -cnotmatch '^sha256:[0-9a-f]{64}$') {
+        throw "Could not verify the exact Docker image ID."
+    }
+    # Read the revision from the immutable ID rather than the mutable tag.
+    $labelsJson = docker image inspect --format '{{json .Config.Labels}}' $imageIds[0]
+    if ($LASTEXITCODE -ne 0 -or
+        ($labelsJson | ConvertFrom-Json).'org.opencontainers.image.revision' -cne $revision) {
+        throw "Docker image source revision does not match archived commit."
+    }
+    return $imageIds[0]
+}
+
+function Assert-PcReleaseImages([string]$root, [string]$commit) {
+    $imageManifest = Join-Path $root "runtime-images.json"
+    if (-not (Test-Path -LiteralPath $imageManifest -PathType Leaf)) {
+        throw "Staged release is missing the inspected Docker image IDs."
+    }
+    $expected = Get-Content -LiteralPath $imageManifest -Raw | ConvertFrom-Json
+    foreach ($kind in @("web", "python")) {
+        $expectedId = $expected.$kind
+        if ($expectedId -isnot [string] -or $expectedId -cnotmatch '^sha256:[0-9a-f]{64}$' -or
+            (Get-VerifiedPcImageId "linguacafe-pc-test-${kind}:$commit" $commit) -cne $expectedId) {
+            throw "Staged PC Test Docker image ID changed since inspection."
+        }
+    }
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -142,21 +172,14 @@ try {
         }
         finally { Pop-Location }
 
-        foreach ($image in @("linguacafe-pc-test-web:$commit", "linguacafe-pc-test-python:$commit")) {
-            # Windows PowerShell strips the nested quotes in Docker's Go template.
-            # Fetch JSON labels instead, then select the exact revision in PowerShell.
-            $labelsJson = docker image inspect --format '{{json .Config.Labels}}' $image
-            if ($LASTEXITCODE -ne 0) {
-                throw "Could not inspect Docker image labels."
-            }
-            $revision = ($labelsJson | ConvertFrom-Json).'org.opencontainers.image.revision'
-            if ($revision -ne $commit) {
-                throw "Docker image source revision does not match archived commit."
-            }
-
+        $inspectedImages = [ordered]@{}
+        foreach ($kind in @("web", "python")) {
+            $image = "linguacafe-pc-test-${kind}:$commit"
+            $imageId = Get-VerifiedPcImageId $image $commit
             # Dependencies can add files after the archived source has passed its filename scan.
-            $imageRoot = if ($image -like "linguacafe-pc-test-web:*") { "/var/www/html" } else { "/app" }
-            $imagePaths = @(docker run --rm --network none --read-only --entrypoint find $image $imageRoot -print)
+            # Scan the identity that we just inspected, not a possibly retagged name.
+            $imageRoot = if ($kind -eq "web") { "/var/www/html" } else { "/app" }
+            $imagePaths = @(docker run --rm --network none --read-only --entrypoint find $imageId $imageRoot -print)
             if ($LASTEXITCODE -ne 0) {
                 throw "Could not inspect final Docker image paths."
             }
@@ -173,13 +196,21 @@ try {
             if ($unsafeImageCount -ne 0) {
                 throw "PC image rejected: $unsafeImageCount disallowed file or directory names."
             }
+            $inspectedImages[$kind] = $imageId
         }
+        $inspectedImages | ConvertTo-Json |
+            Set-Content -LiteralPath (Join-Path $stageDir "runtime-images.json") -Encoding UTF8
+        Assert-PcReleaseImages $stageDir $commit
 
         Set-Content -LiteralPath (Join-Path $stageDir "runtime-version.txt") -Value $commit -Encoding ascii -NoNewline
         $releaseFiles = @(Get-ReleaseFileManifest $stageDir)
         if ($releaseFiles.Count -eq 0) { throw "PC release has no files to verify." }
         $releaseFiles | ConvertTo-Json -Depth 3 |
             Set-Content -LiteralPath (Join-Path $stageDir "release-manifest.json") -Encoding UTF8
+    }
+    if ($ActivateStaged) {
+        # The release file manifest covered these IDs; recheck them just before switching.
+        Assert-PcReleaseImages $releaseDir $commit
     }
     $desktop = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktop "LinguaCafe PC Test Study V5.lnk"
