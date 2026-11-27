@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReviewCard;
+use App\Models\WordSense;
 use App\Services\AnkiWordSensePackageService;
 use App\Services\InvalidBrowserSearchException;
 use App\Services\PortableDataService;
@@ -185,6 +186,11 @@ class PortableDataController extends Controller
             ->where('user_id', $user->id)
             ->where('language_id', $user->selected_language)
             ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->whereHas('sense', function ($senseQuery) use ($user) {
+                $senseQuery->where('user_id', $user->id)
+                    ->where('language_id', $user->selected_language)
+                    ->where('status', WordSense::STATUS_CONFIRMED);
+            })
             ->orderBy('id');
         $total = $query->count();
         if ($total > ReviewCardExportService::EXPORT_LIMIT) {

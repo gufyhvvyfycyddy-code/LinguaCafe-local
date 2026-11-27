@@ -255,6 +255,46 @@ class M16PortableDataTest extends TestCase
         }
     }
 
+    public function test_full_package_export_does_not_expose_foreign_or_unconfirmed_senses(): void
+    {
+        [$ownSense] = $this->senseCard('own-confirmed');
+        $foreignUser = User::forceCreate([
+            'name' => 'Foreign Export Owner', 'email' => 'm16-foreign-export@example.test',
+            'password' => Hash::make('password'), 'selected_language' => 'english',
+            'password_changed' => true, 'uuid' => (string) Str::uuid(),
+        ]);
+        [$foreignSense] = $this->senseCardFor($foreignUser, 'foreign-private');
+        ReviewCard::forceCreate([
+            'user_id' => $this->user->id, 'language' => 'english', 'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE, 'target_id' => $foreignSense->id,
+            'fsrs_state' => 'review', 'fsrs_due_at' => now()->addDay(),
+            'fsrs_enabled' => true, 'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+        ]);
+        [$unconfirmed] = $this->senseCard('pending-private');
+        $unconfirmed->forceFill(['status' => WordSense::STATUS_AI_SUGGESTED])->save();
+        [$wrongLanguage] = $this->senseCard('wrong-language-private');
+        $wrongLanguage->forceFill(['language' => 'spanish', 'language_id' => 'spanish'])->save();
+
+        $beforeCards = ReviewCard::count();
+        $response = $this->actingAs($this->user)
+            ->get('/review-cards/manage/portable/export-full')->assertOk();
+        $path = tempnam(sys_get_temp_dir(), 'm16-full-owner-');
+        $this->temporaryFiles[] = $path;
+        file_put_contents($path, $response->streamedContent());
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        try {
+            $content = json_decode($zip->getFromName('content.json'), true, 512, JSON_THROW_ON_ERROR);
+        } finally {
+            $zip->close();
+        }
+
+        $this->assertSame(['own-confirmed'], array_column($content['items'], 'lemma'));
+        $this->assertSame(1, $content['count']);
+        $this->assertSame($beforeCards, ReviewCard::count());
+        $this->assertDatabaseCount('review_logs', 0);
+    }
+
     public function test_full_package_manifest_counts_only_exported_sense_history(): void
     {
         [$sense] = $this->senseCard('sense-history-scope');
