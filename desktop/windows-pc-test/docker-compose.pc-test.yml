@@ -1,4 +1,4 @@
-name: linguacafe-pc-test-study-v4
+name: linguacafe-pc-test-study-v5
 
 networks:
   pc-test:
@@ -14,7 +14,7 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: linguacafe_pc_test_study_v4
+      MYSQL_DATABASE: linguacafe_pc_test_study_v5
       MYSQL_USER: linguacafe_pc_test
       MYSQL_PASSWORD: pc-test-only
       MYSQL_ROOT_PASSWORD: pc-test-root-only
@@ -68,12 +68,12 @@ services:
       APP_ENV: local
       APP_DEBUG: "false"
       APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-      APP_URL: http://127.0.0.1:9396
+      APP_URL: http://127.0.0.1:9397
       ALLOW_WEB_REGISTER: "false"
       DB_CONNECTION: mysql
       DB_HOST: mysql
       DB_PORT: "3306"
-      DB_DATABASE: linguacafe_pc_test_study_v4
+      DB_DATABASE: linguacafe_pc_test_study_v5
       DB_USERNAME: linguacafe_pc_test
       DB_PASSWORD: pc-test-only
       SESSION_DRIVER: file
@@ -101,8 +101,8 @@ services:
       BACKUP_RESTORE_VALIDATION_PASSWORD: pc-test-root-only
       LOG_CHANNEL: stderr
     ports:
-      - "127.0.0.1:9396:80"
-      - "127.0.0.1:6006:6001"
+      - "127.0.0.1:9397:80"
+      - "127.0.0.1:6007:6001"
     volumes:
       - storage-data:/var/www/html/storage
       - "${PC_TEST_ECDICT_CSV:-./empty-ecdict.csv}:/pc-test/ecdict.csv:ro"

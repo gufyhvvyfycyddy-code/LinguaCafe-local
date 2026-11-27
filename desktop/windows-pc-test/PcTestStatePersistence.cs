@@ -13,7 +13,7 @@ namespace LinguaCafe.PcTest;
 internal static class PcTestStatePersistence
 {
     private static readonly byte[] Purpose = Encoding.UTF8.GetBytes(
-        "LinguaCafe.PcTest.StudyV4.AdminPassword.v1");
+        "LinguaCafe.PcTest.StudyV5.AdminPassword.v1");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

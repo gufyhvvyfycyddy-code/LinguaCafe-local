@@ -8,10 +8,10 @@ namespace LinguaCafe.PcTest;
 
 public sealed class RuntimeManager
 {
-    public const string BaseUrl = "http://127.0.0.1:9396";
+    public const string BaseUrl = "http://127.0.0.1:9397";
 
     private string runtimeImageTag = "dev";
-    internal static readonly string DataRoot = Path.Combine(@"D:\AI-Tools", "LinguaCafe", "PC-Test");
+    internal static readonly string DataRoot = Path.Combine(@"D:\AI-Tools", "LinguaCafe", "PC-Test-V5");
     private readonly string appDataRoot;
     private readonly string legacyStatePath;
 
@@ -26,7 +26,7 @@ public sealed class RuntimeManager
     }
     private static readonly string LegacyStatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LinguaCafePCTestStudyV4", "state.json");
+        "LinguaCafePCTestStudyV5", "state.json");
 
     public string StatePath => Path.Combine(appDataRoot, "state.json");
 
@@ -73,7 +73,7 @@ public sealed class RuntimeManager
 
         var common = new[]
         {
-            "compose", "-p", "linguacafe-pc-test-study-v4", "-f", composeFile,
+            "compose", "-p", "linguacafe-pc-test-study-v5", "-f", composeFile,
         };
 
         var webImage = $"linguacafe-pc-test-web:{runtimeImageTag}";
