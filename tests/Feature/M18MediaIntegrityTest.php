@@ -343,6 +343,18 @@ class M18MediaIntegrityTest extends TestCase
             'copyright_status' => 'licensed',
             'copyright_source' => 'Portable fixture licence',
         ])->assertCreated();
+        // Exporting one sense must not include media owned by a different sense.
+        $excludedSense = $sense->replicate();
+        $excludedSense->lemma = 'excluded-from-package';
+        $excludedSense->sense_key = hash('sha256', 'm18-excluded-from-package');
+        $excludedSense->save();
+        $this->actingAs($source)->post('/word-senses/' . $excludedSense->id . '/media', [
+            'file' => $this->mp3('excluded.mp3', 'excluded-audio'),
+            'role' => MediaReference::ROLE_WORD_PRONUNCIATION,
+            'copyright_status' => 'licensed',
+            'copyright_source' => 'Portable fixture licence',
+        ])->assertCreated();
+        $this->assertDatabaseCount('media_references', 2);
         $items = app(ReviewCardManageItemSerializerService::class)
             ->buildItems(ReviewCard::query()->whereKey($card->id)->get(), $source->id, 'english')->all();
         $service = app(PortableDataService::class);
